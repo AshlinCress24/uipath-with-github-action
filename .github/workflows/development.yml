@@ -6,6 +6,7 @@ on:
       - develop # This workflow runs when code is pushed to the 'develop' branch
 
 env:
+  # UiPath Project Details
   PROJECT_NAME: Addition_of_2_Numbers                       
   PROJECT_FOLDER: .
   ORCH_URL: https://cloud.uipath.com/noviggptduln/DefaultTenant
@@ -15,88 +16,44 @@ env:
   ORCH_DEV_FOLDER_PATH: Shared
 
 jobs:
+  # Job to build the Nuget package and publish it to Orchestrator
   build-and-publish:
-    runs-on: windows-latest
+    runs-on: windows-latest # Windows runners are recommended for UiPath automation
 
     steps:
       - name: Checkout Your Repository Code
+        # Clones your own repository (containing your UiPath project code)
         uses: actions/checkout@v4
 
-      - name: Clone UiPath DevOps Scripts
-        uses: actions/checkout@v4
+      - name: Build UiPath NuGet Package
+        # This action packs your UiPath project into a NuGet package (.nupkg)
+        uses: uipath/actions/pack-project-to-nuget-package@v1 # Official UiPath Action
         with:
-          repository: UiPath-Services/UiPath-DevOps-Scripts
-          path: devops-scripts
-
-      - name: Verify Cloned Scripts Content # Keep this step for now, it's very useful for debugging!
-        shell: pwsh
-        run: |
-          Write-Host "Listing contents of devops-scripts folder:"
-          Get-ChildItem -Path "${{ github.workspace }}\devops-scripts" -Recurse | Select-Object FullName, Name
-          Write-Host "Attempting to locate Invoke-UiPathDevOps.ps1:"
-          Test-Path "${{ github.workspace }}\devops-scripts\scripts\Invoke-UiPathDevOps.ps1" # Corrected path for testing
-          Test-Path "${{ github.workspace }}\devops-scripts\scripts\Shared" # Corrected path for testing
-
-      - name: Install PowerShell Modules (Required by UiPath-DevOps-Scripts)
-        shell: pwsh
-        run: |
-          Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
-
-      - name: Build UiPath NuGet Package and Publish to Orchestrator Development Folder
-        shell: pwsh
-        run: |
-          # CORRECTED PATH HERE: Added 'scripts\' subfolder
-          ./devops-scripts/scripts/Invoke-UiPathDevOps.ps1 `
-            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
-            -OrchestratorUrl "${{ env.ORCH_URL }}" `
-            -TenantName "${{ env.ORCH_TENANT }}" `
-            -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" `
-            -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" `
-            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" `
-            -PublishType "Orchestrator" `
-            -LogActivity "true" `
-            -PackageVersion "auto" `
-            -AllowOrchestratorAuthentication
+          project-path: ${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json # Path to your project.json
+          output-path: ${{ github.workspace }}\package # Folder where the .nupkg will be created
+          package-version: auto # Automatically increments package version
 
       - name: Upload UiPath Artifact (NuGet package)
+        # This step saves the generated .nupkg file as a workflow artifact.
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PROJECT_NAME }}.nupkg
-          path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg"
+          path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
 
-  test-published-package:
-    needs: build-and-publish
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout Your Repository Code (needed for project.json)
-        uses: actions/checkout@v4
-
-      - name: Clone UiPath DevOps Scripts (for testing commands)
-        uses: actions/checkout@v4
+      - name: Deploy Nuget Package to Orchestrator Development Folder
+        # This action deploys the generated NuGet package to your Orchestrator
+        uses: uipath/actions/deploy-package-to-orchestrator@v1 # Official UiPath Action
         with:
-          repository: UiPath-Services/UiPath-DevOps-Scripts
-          path: devops-scripts
+          orchestrator-url: ${{ env.ORCH_URL }}
+          tenant-name: ${{ env.ORCH_TENANT }}
+          client-id: ${{ secrets.ORCH_CLIENT_ID }} # Using GitHub Secret
+          client-secret: ${{ secrets.ORCH_CLIENT_SECRET }} # Using GitHub Secret
+          orchestrator-folder-path: ${{ env.ORCH_DEV_FOLDER_PATH }} # Orchestrator folder for deployment
+          package-path: ${{ github.workspace }}\package # Folder where the .nupkg is located
+          process-name: ${{ env.PROJECT_NAME }} # Name of the process to update/create (usually same as project name)
+          # Optional: process-type: Attended / Unattended (default is Unattended)
 
-      - name: Install PowerShell Modules (for testing scripts)
-        shell: pwsh
-        run: |
-          Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
-
-      - name: Run Tests on Published Package in Orchestrator
-        shell: pwsh
-        run: |
-          # CORRECTED PATH HERE: Added 'scripts\' subfolder
-          ./devops-scripts/scripts/Invoke-UiPathDevOps.ps1 `
-            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
-            -OrchestratorUrl "${{ env.ORCH_URL }}" `
-            -TenantName "${{ env.ORCH_TENANT }}" `
-            -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" `
-            -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" `
-            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" `
-            -ProcessName "${{ env.PROJECT_NAME }}" `
-            -RunTestCases "true" `
-            -LogActivity "true" `
-            -AllowOrchestratorAuthentication
+  # --- The 'test-published-package' job has been removed for now. ---
+  # You can add it back later once you have a Test Set configured in Orchestrator.
+  # When you do, uncomment or re-add the job exactly as it was provided in the previous response,
+  # and make sure to replace 'YOUR_TEST_SET_NAME' with the actual name of your Test Set.
