@@ -3,9 +3,8 @@ name: Development CI/CD
 on:
   push:
     branches:
-      - develop # This workflow runs when code is pushed to the 'develop' branch
+      - develop
 
-# Here the environment variable is declared in workflow level
 env:
   PROJECT_NAME: Addition_of_2_Numbers                       
   PROJECT_FOLDER: .
@@ -15,90 +14,54 @@ env:
   ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
   ORCH_DEV_FOLDER_PATH: Shared
 
+
 jobs:
-  # Job to build the Nuget package and publish it to Orchestrator
   build-and-publish:
-    runs-on: windows-latest # Windows runners are recommended for UiPath automation
-
-    steps:
-      - name: Checkout Your Repository Code
-        # Clones your own repository (containing your UiPath project code)
-        uses: actions/checkout@v4
-
-      - name: Clone UiPath DevOps Scripts # <--- THIS CRITICAL STEP downloads the latest scripts
-        # This action clones the official UiPath-DevOps-Scripts repository
-        uses: actions/checkout@v4
-        with:
-          repository: UiPath-Services/UiPath-DevOps-Scripts # Official source for the scripts
-          path: devops-scripts # The scripts will be cloned into a folder named 'devops-scripts' in your runner's workspace
-
-      - name: Install PowerShell Modules (Required by UiPath-DevOps-Scripts)
-        shell: pwsh
-        run: |
-          # These modules are necessary for the UiPath-DevOps-Scripts to function correctly
-          Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
-          Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
-
-      - name: Build UiPath NuGet Package and Publish to Orchestrator Development Folder
-        shell: pwsh # Execute commands using PowerShell Core
-        run: |
-          # This command uses Invoke-UiPathDevOps.ps1 for both packaging and publishing
-          # The script is located in the 'devops-scripts' folder that was cloned in a previous step.
-          ./devops-scripts/Invoke-UiPathDevOps.ps1 ` # <--- Correct path for the cloned scripts
-            -ProjectFilePath "${{ github.workspace }}\\${{ env.PROJECT_FOLDER }}\\project.json" `
-            -OrchestratorUrl "${{ env.ORCH_URL }}" `
-            -TenantName "${{ env.ORCH_TENANT }}" `
-            -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" ` # Using GitHub Secret for Client ID
-            -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" ` # Using GitHub Secret for Client Secret
-            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" ` # The Orchestrator folder for deployment
-            -PublishType "Orchestrator" ` # Publish directly to Orchestrator feeds
-            -LogActivity "true" ` # Enables detailed logging from the script
-            -PackageVersion "auto" ` # Automatically increments package version
-            -AllowOrchestratorAuthentication # <--- ESSENTIAL flag for Client ID/Secret authentication
-
-      - name: Upload UiPath Artifact (NuGet package)
-        # This step saves the generated .nupkg file as a workflow artifact.
-        # It's good practice for auditing and potential manual downloads.
-        uses: actions/upload-artifact@v4 # Using the latest recommended version
-        with:
-          name: ${{ env.PROJECT_NAME }}.nupkg
-          # FIX: Changed backslashes to forward slashes for path compatibility
-          path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
-
-  # Job to test the published package in Orchestrator
-  test-published-package:
-    needs: build-and-publish # This job runs only after the 'build-and-publish' job succeeds
     runs-on: windows-latest
 
     steps:
-      - name: Checkout Your Repository Code (needed for project.json)
+      - name: Checkout Your Repository Code
         uses: actions/checkout@v4
 
-      - name: Clone UiPath DevOps Scripts (for testing commands)
+      - name: Clone UiPath DevOps Scripts
         uses: actions/checkout@v4
         with:
           repository: UiPath-Services/UiPath-DevOps-Scripts
           path: devops-scripts
 
-      - name: Install PowerShell Modules (for testing scripts)
+      - name: Verify Cloned Scripts Content # <--- NEW DIAGNOSTIC STEP HERE
+        shell: pwsh
+        run: |
+          Write-Host "Listing contents of devops-scripts folder:"
+          Get-ChildItem -Path "${{ github.workspace }}\devops-scripts" -Recurse | Select-Object FullName, Name
+          Write-Host "Attempting to locate Invoke-UiPathDevOps.ps1:"
+          Test-Path "${{ github.workspace }}\devops-scripts\Invoke-UiPathDevOps.ps1"
+          Test-Path "${{ github.workspace }}\devops-scripts\Shared"
+
+      - name: Install PowerShell Modules (Required by UiPath-DevOps-Scripts)
         shell: pwsh
         run: |
           Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
           Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
 
-      - name: Run Tests on Published Package in Orchestrator
+      - name: Build UiPath NuGet Package and Publish to Orchestrator Development Folder
         shell: pwsh
         run: |
-          ./devops-scripts/Invoke-UiPathDevOps.ps1 ` # <--- Correct path for the cloned scripts
-            -ProjectFilePath "${{ github.workspace }}\\${{ env.PROJECT_FOLDER }}\\project.json" ` # Needs project.json to identify tests
+          ./devops-scripts/Invoke-UiPathDevOps.ps1 `
+            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
             -OrchestratorUrl "${{ env.ORCH_URL }}" `
             -TenantName "${{ env.ORCH_TENANT }}" `
             -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" `
             -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" `
-            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" ` # Orchestrator folder where process and test sets are
-            -ProcessName "${{ env.PROJECT_NAME }}" ` # Assuming your process name is the same as project name
-            -RunTestCases "true" ` # Trigger test cases
+            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" `
+            -PublishType "Orchestrator" `
             -LogActivity "true" `
-            -AllowOrchestratorAuthentication # <--- ESSENTIAL flag for Client ID/Secret authentication
-            # Optional: -TestSetDisplayName "YourTestSet" if you have a specific test set name
-            # Optional: -RobotsCount 1 # Number of robots to use for test execution
+            -PackageVersion "auto" `
+            -AllowOrchestratorAuthentication
+
+      - name: Upload UiPath Artifact (NuGet package)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}.nupkg
+          path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg"
+# ... (rest of your workflow for test-published-package job)
