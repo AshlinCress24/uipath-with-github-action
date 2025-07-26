@@ -78,7 +78,7 @@
       <AssemblyReference>System.Runtime.Numerics</AssemblyReference>
     </sco:Collection>
   </TextExpression.ReferencesForImplementation>
-  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="985,529" sap2010:WorkflowViewState.IdRef="Sequence_1">
+  <Sequence DisplayName="Main Sequence" sap:VirtualizedContainerService.HintSize="985,709" sap2010:WorkflowViewState.IdRef="Sequence_1">
     <Sequence.Variables>
       <Variable x:TypeArguments="x:Int32" Name="num1" />
       <Variable x:TypeArguments="x:Int32" Name="num2" />
@@ -89,7 +89,8 @@
         <x:Boolean x:Key="IsExpanded">True</x:Boolean>
       </scg:Dictionary>
     </sap:WorkflowViewStateService.ViewState>
-    <Assign DisplayName="Assign the value 10 to the num1 variable" sap:VirtualizedContainerService.HintSize="434,114" sap2010:WorkflowViewState.IdRef="Assign_1">
+    <ui:LogMessage DisplayName="Log Message" sap:VirtualizedContainerService.HintSize="450,175" sap2010:WorkflowViewState.IdRef="LogMessage_2" Level="Info" Message="[&quot;Started Addition&quot;]" />
+    <Assign DisplayName="Assign the value 10 to the num1 variable" sap:VirtualizedContainerService.HintSize="450,115" sap2010:WorkflowViewState.IdRef="Assign_1">
       <Assign.To>
         <OutArgument x:TypeArguments="x:Int32">[num1]</OutArgument>
       </Assign.To>
@@ -97,7 +98,7 @@
         <InArgument x:TypeArguments="x:Int32">10</InArgument>
       </Assign.Value>
     </Assign>
-    <Assign DisplayName="Assign value to num2" sap:VirtualizedContainerService.HintSize="434,114" sap2010:WorkflowViewState.IdRef="Assign_2">
+    <Assign DisplayName="Assign value to num2" sap:VirtualizedContainerService.HintSize="450,115" sap2010:WorkflowViewState.IdRef="Assign_2">
       <Assign.To>
         <OutArgument x:TypeArguments="x:Int32">[num2]</OutArgument>
       </Assign.To>
@@ -105,7 +106,7 @@
         <InArgument x:TypeArguments="x:Int32">20</InArgument>
       </Assign.Value>
     </Assign>
-    <Assign DisplayName="Calculate the sum of two numbers" sap:VirtualizedContainerService.HintSize="434,114" sap2010:WorkflowViewState.IdRef="Assign_3">
+    <Assign DisplayName="Calculate the sum of two numbers" sap:VirtualizedContainerService.HintSize="450,115" sap2010:WorkflowViewState.IdRef="Assign_3">
       <Assign.To>
         <OutArgument x:TypeArguments="x:Int32">[sum]</OutArgument>
       </Assign.To>
@@ -113,6 +114,6 @@
         <InArgument x:TypeArguments="x:Int32">[num1+num2]</InArgument>
       </Assign.Value>
     </Assign>
-    <ui:LogMessage DisplayName="Calculates and logs the sum of two numbers" sap:VirtualizedContainerService.HintSize="434,164" sap2010:WorkflowViewState.IdRef="LogMessage_1" Level="Info" Message="[&quot;The sum calculated is : &quot;+sum.ToString]" />
+    <ui:LogMessage DisplayName="Calculates and logs the sum of two numbers" sap:VirtualizedContainerService.HintSize="450,166" sap2010:WorkflowViewState.IdRef="LogMessage_1" Level="Info" Message="[&quot;The sum calculated is : &quot;+sum.ToString]" />
   </Sequence>
 </Activity>
