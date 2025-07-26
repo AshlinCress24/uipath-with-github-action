@@ -7,15 +7,14 @@ on:
 
 # Here the environment variable is declared in workflow level
 env:
- # Replace with your Orchestrator Values 
-  PROJECT_NAME: Addition_of_2_Numbers                         
+  PROJECT_NAME: Addition_of_2_Numbers                       
   PROJECT_FOLDER: .
   ORCH_URL: https://cloud.uipath.com/noviggptduln/DefaultTenant
   ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
   ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
   ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
   ORCH_DEV_FOLDER_PATH: Shared
-  
+
 jobs:
   # Job to build the Nuget package and publish it to Orchestrator
   build-and-publish:
@@ -46,7 +45,7 @@ jobs:
           # This command uses Invoke-UiPathDevOps.ps1 for both packaging and publishing
           # The script is located in the 'devops-scripts' folder that was cloned in a previous step.
           ./devops-scripts/Invoke-UiPathDevOps.ps1 ` # <--- Correct path for the cloned scripts
-            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
+            -ProjectFilePath "${{ github.workspace }}\\${{ env.PROJECT_FOLDER }}\\project.json" `
             -OrchestratorUrl "${{ env.ORCH_URL }}" `
             -TenantName "${{ env.ORCH_TENANT }}" `
             -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" ` # Using GitHub Secret for Client ID
@@ -63,7 +62,8 @@ jobs:
         uses: actions/upload-artifact@v4 # Using the latest recommended version
         with:
           name: ${{ env.PROJECT_NAME }}.nupkg
-          path: "${{ github.workspace }}\package\${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
+          # FIX: Changed backslashes to forward slashes for path compatibility
+          path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
 
   # Job to test the published package in Orchestrator
   test-published-package:
@@ -90,7 +90,7 @@ jobs:
         shell: pwsh
         run: |
           ./devops-scripts/Invoke-UiPathDevOps.ps1 ` # <--- Correct path for the cloned scripts
-            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" ` # Needs project.json to identify tests
+            -ProjectFilePath "${{ github.workspace }}\\${{ env.PROJECT_FOLDER }}\\project.json" ` # Needs project.json to identify tests
             -OrchestratorUrl "${{ env.ORCH_URL }}" `
             -TenantName "${{ env.ORCH_TENANT }}" `
             -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" `
@@ -102,7 +102,3 @@ jobs:
             -AllowOrchestratorAuthentication # <--- ESSENTIAL flag for Client ID/Secret authentication
             # Optional: -TestSetDisplayName "YourTestSet" if you have a specific test set name
             # Optional: -RobotsCount 1 # Number of robots to use for test execution
-
-  # NOTE: The 'print-details', 'cleaner', 'create-pull-request', and 'notify' jobs
-  # were removed for now to focus on getting the core build/publish/test working.
-  # You can re-add them after this primary pipeline is stable.
