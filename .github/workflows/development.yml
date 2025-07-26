@@ -3,7 +3,7 @@ name: Development CI/CD
 on:
   push:
     branches:
-      - develop
+      - develop # This workflow runs when code is pushed to the 'develop' branch
 
 env:
   PROJECT_NAME: Addition_of_2_Numbers                       
@@ -13,7 +13,6 @@ env:
   ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
   ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
   ORCH_DEV_FOLDER_PATH: Shared
-
 
 jobs:
   build-and-publish:
@@ -29,14 +28,14 @@ jobs:
           repository: UiPath-Services/UiPath-DevOps-Scripts
           path: devops-scripts
 
-      - name: Verify Cloned Scripts Content # <--- NEW DIAGNOSTIC STEP HERE
+      - name: Verify Cloned Scripts Content # Keep this step for now, it's very useful for debugging!
         shell: pwsh
         run: |
           Write-Host "Listing contents of devops-scripts folder:"
           Get-ChildItem -Path "${{ github.workspace }}\devops-scripts" -Recurse | Select-Object FullName, Name
           Write-Host "Attempting to locate Invoke-UiPathDevOps.ps1:"
-          Test-Path "${{ github.workspace }}\devops-scripts\Invoke-UiPathDevOps.ps1"
-          Test-Path "${{ github.workspace }}\devops-scripts\Shared"
+          Test-Path "${{ github.workspace }}\devops-scripts\scripts\Invoke-UiPathDevOps.ps1" # Corrected path for testing
+          Test-Path "${{ github.workspace }}\devops-scripts\scripts\Shared" # Corrected path for testing
 
       - name: Install PowerShell Modules (Required by UiPath-DevOps-Scripts)
         shell: pwsh
@@ -47,7 +46,8 @@ jobs:
       - name: Build UiPath NuGet Package and Publish to Orchestrator Development Folder
         shell: pwsh
         run: |
-          ./devops-scripts/Invoke-UiPathDevOps.ps1 `
+          # CORRECTED PATH HERE: Added 'scripts\' subfolder
+          ./devops-scripts/scripts/Invoke-UiPathDevOps.ps1 `
             -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
             -OrchestratorUrl "${{ env.ORCH_URL }}" `
             -TenantName "${{ env.ORCH_TENANT }}" `
@@ -64,4 +64,39 @@ jobs:
         with:
           name: ${{ env.PROJECT_NAME }}.nupkg
           path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg"
-# ... (rest of your workflow for test-published-package job)
+
+  test-published-package:
+    needs: build-and-publish
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Your Repository Code (needed for project.json)
+        uses: actions/checkout@v4
+
+      - name: Clone UiPath DevOps Scripts (for testing commands)
+        uses: actions/checkout@v4
+        with:
+          repository: UiPath-Services/UiPath-DevOps-Scripts
+          path: devops-scripts
+
+      - name: Install PowerShell Modules (for testing scripts)
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Run Tests on Published Package in Orchestrator
+        shell: pwsh
+        run: |
+          # CORRECTED PATH HERE: Added 'scripts\' subfolder
+          ./devops-scripts/scripts/Invoke-UiPathDevOps.ps1 `
+            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
+            -OrchestratorUrl "${{ env.ORCH_URL }}" `
+            -TenantName "${{ env.ORCH_TENANT }}" `
+            -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" `
+            -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" `
+            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" `
+            -ProcessName "${{ env.PROJECT_NAME }}" `
+            -RunTestCases "true" `
+            -LogActivity "true" `
+            -AllowOrchestratorAuthentication
