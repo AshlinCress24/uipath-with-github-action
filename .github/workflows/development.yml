@@ -1,114 +1,108 @@
-name: Development workflow
+name: Development CI/CD
 
 on:
   push:
     branches:
-      - develop
+      - develop # This workflow runs when code is pushed to the 'develop' branch
 
 # Here the environment variable is declared in workflow level
 env:
-  # Replace with your Orchestrator Values 
-  PROJECT_NAME: Addition_of_2_Numbers                         
+ # Replace with your Orchestrator Values 
+  PROJECT_NAME: Addition_of_2_Numbers                         
   PROJECT_FOLDER: .
   ORCH_URL: https://cloud.uipath.com/noviggptduln/DefaultTenant
   ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
   ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
   ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
-
+  ORCH_DEV_FOLDER_PATH: Shared
+  
 jobs:
-  print-details:
-    runs-on: ubuntu-latest
-    steps:
-      - name: echo-default-env-variables
-        run: |
-          echo "Home: ${HOME}"
-          echo "GITHUB_WORKFLOW: ${GITHUB_WORKFLOW}"
-          echo "GITHUB_ACTIONS: ${GITHUB_ACTIONS}"
-          echo "GITHUB_ACTOR: ${GITHUB_ACTOR}"
-          echo "GITHUB_REPOSITORY: ${GITHUB_REPOSITORY}"
-          echo "GITHUB_EVENT_NAME: ${GITHUB_EVENT_NAME}"
-          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE}"
-          echo "GITHUB_SHA: ${GITHUB_SHA}"
-          echo "GITHUB_REF: ${GITHUB_REF}"
-  cleaner:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Runner workspace path
-        run: |
-          echo "Cleaning up previous run"
-          rm -rf "${{ github.workspace }}"
+  # Job to build the Nuget package and publish it to Orchestrator
+  build-and-publish:
+    runs-on: windows-latest # Windows runners are recommended for UiPath automation
 
-  build-uipath-nuget-package:
-    # You should be able to run on windows 2019 or windows latest
-    needs: cleaner
-    runs-on: windows-latest
-    steps: 
-      - name: Check out repository code
-        # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-        uses: actions/checkout@v4
-      - name: Build Nuget Package
-        shell: pwsh
-        run: ${{ github.workspace }}\scripts\UiPathPack.ps1 ${{ github.workspace }}\project.json -destination_folder ${{ github.workspace }}\package
-      - name: Upload UiPath Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Artifacts
-          path: |
-           package/*.*
-           scripts/*.ps1
-  publish-uipath-nuget-package:
-    needs: build-uipath-nuget-package
-    runs-on: windows-latest
-    steps: 
-      - name: Download UiPath Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: Artifacts
-      - name: Publish Nuget Package to DEV
-        shell: pwsh
-        run: ${{ github.workspace }}\scripts\Invoke-UiPathDevOps.ps1 ${{ github.workspace }}\package ${{env.ORCH_URL}} ${{env.ORCH_TENANT}} -UserKey ${{env.ORCH_USER_KEY}} -account_name ${{env.ORCH_ACC_NAME}}
-   
-  test-uipath-published-package:
-    needs: publish-uipath-nuget-package
-    runs-on: windows-latest  
-    steps: 
-      - name: Download UiPath Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: Artifacts
-      - name: Test the Package With Test Cases 
-        run: ${{ github.workspace }}\scripts\\UiPathRunTest.ps1  ${{env.ORCH_URL}} ${{env.ORCH_TENANT}} -UserKey ${{env.ORCH_USER_KEY}} -account_name ${{env.ORCH_ACC_NAME}} -testset "TestSet1"
-  
-  # Create Pull Request for Merge & Review
-  create-pull-request:
-    needs: test-uipath-published-package
-    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
+      - name: Checkout Your Repository Code
+        # Clones your own repository (containing your UiPath project code)
         uses: actions/checkout@v4
-      - name: pull-request
-        uses: repo-sync/pull-request@v4
-        with:
-          destination_branch: "master"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_label: "feature, automated pr"
-          pr_title: "Pull Request From Github Action"
-  
-  # "notify" workflow for slack notification
-  notify:
-    name: Notify on Slack
-    runs-on: ubuntu-latest
-    # Only run this workflow when "build" workflow succeeds
-    needs: [ test-uipath-published-package]
-    # Only run this workflow if it target is main branch on pull_request event
-    steps:
-      - uses: abinoda/slack-action@master
-        env:
-          # required
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        with:
-          # custom message to send to slack
-          args: '{\"channel\":\"${{ secrets.SLACK_PR_CHANNEL_ID }}\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"*Pull Request:* ${{ github.event.pull_request.title }}\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"*Contributor :* ${{ github.event.pull_request.user.login }}\n*Request State:* ${{ github.event.pull_request.state }}\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"<${{ github.event.pull_request.html_url }}|View Pull Request>\"}}]}' 
-        # Pick up events even if the job is success.
-        if: success()
 
+      - name: Clone UiPath DevOps Scripts # <--- THIS CRITICAL STEP downloads the latest scripts
+        # This action clones the official UiPath-DevOps-Scripts repository
+        uses: actions/checkout@v4
+        with:
+          repository: UiPath-Services/UiPath-DevOps-Scripts # Official source for the scripts
+          path: devops-scripts # The scripts will be cloned into a folder named 'devops-scripts' in your runner's workspace
+
+      - name: Install PowerShell Modules (Required by UiPath-DevOps-Scripts)
+        shell: pwsh
+        run: |
+          # These modules are necessary for the UiPath-DevOps-Scripts to function correctly
+          Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Build UiPath NuGet Package and Publish to Orchestrator Development Folder
+        shell: pwsh # Execute commands using PowerShell Core
+        run: |
+          # This command uses Invoke-UiPathDevOps.ps1 for both packaging and publishing
+          # The script is located in the 'devops-scripts' folder that was cloned in a previous step.
+          ./devops-scripts/Invoke-UiPathDevOps.ps1 ` # <--- Correct path for the cloned scripts
+            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" `
+            -OrchestratorUrl "${{ env.ORCH_URL }}" `
+            -TenantName "${{ env.ORCH_TENANT }}" `
+            -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" ` # Using GitHub Secret for Client ID
+            -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" ` # Using GitHub Secret for Client Secret
+            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" ` # The Orchestrator folder for deployment
+            -PublishType "Orchestrator" ` # Publish directly to Orchestrator feeds
+            -LogActivity "true" ` # Enables detailed logging from the script
+            -PackageVersion "auto" ` # Automatically increments package version
+            -AllowOrchestratorAuthentication # <--- ESSENTIAL flag for Client ID/Secret authentication
+
+      - name: Upload UiPath Artifact (NuGet package)
+        # This step saves the generated .nupkg file as a workflow artifact.
+        # It's good practice for auditing and potential manual downloads.
+        uses: actions/upload-artifact@v4 # Using the latest recommended version
+        with:
+          name: ${{ env.PROJECT_NAME }}.nupkg
+          path: "${{ github.workspace }}\package\${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
+
+  # Job to test the published package in Orchestrator
+  test-published-package:
+    needs: build-and-publish # This job runs only after the 'build-and-publish' job succeeds
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Your Repository Code (needed for project.json)
+        uses: actions/checkout@v4
+
+      - name: Clone UiPath DevOps Scripts (for testing commands)
+        uses: actions/checkout@v4
+        with:
+          repository: UiPath-Services/UiPath-DevOps-Scripts
+          path: devops-scripts
+
+      - name: Install PowerShell Modules (for testing scripts)
+        shell: pwsh
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name CredentialManager -Force -SkipPublisherCheck -AllowClobber
+
+      - name: Run Tests on Published Package in Orchestrator
+        shell: pwsh
+        run: |
+          ./devops-scripts/Invoke-UiPathDevOps.ps1 ` # <--- Correct path for the cloned scripts
+            -ProjectFilePath "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json" ` # Needs project.json to identify tests
+            -OrchestratorUrl "${{ env.ORCH_URL }}" `
+            -TenantName "${{ env.ORCH_TENANT }}" `
+            -OrchestratorClientId "${{ secrets.ORCH_CLIENT_ID }}" `
+            -OrchestratorClientSecret "${{ secrets.ORCH_CLIENT_SECRET }}" `
+            -OrchestratorFolderPath "${{ env.ORCH_DEV_FOLDER_PATH }}" ` # Orchestrator folder where process and test sets are
+            -ProcessName "${{ env.PROJECT_NAME }}" ` # Assuming your process name is the same as project name
+            -RunTestCases "true" ` # Trigger test cases
+            -LogActivity "true" `
+            -AllowOrchestratorAuthentication # <--- ESSENTIAL flag for Client ID/Secret authentication
+            # Optional: -TestSetDisplayName "YourTestSet" if you have a specific test set name
+            # Optional: -RobotsCount 1 # Number of robots to use for test execution
+
+  # NOTE: The 'print-details', 'cleaner', 'create-pull-request', and 'notify' jobs
+  # were removed for now to focus on getting the core build/publish/test working.
+  # You can re-add them after this primary pipeline is stable.
