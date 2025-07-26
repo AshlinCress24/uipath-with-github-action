@@ -6,7 +6,6 @@ on:
       - develop # This workflow runs when code is pushed to the 'develop' branch
 
 env:
-  # UiPath Project Details
   PROJECT_NAME: Addition_of_2_Numbers                       
   PROJECT_FOLDER: .
   ORCH_URL: https://cloud.uipath.com/noviggptduln/DefaultTenant
@@ -26,23 +25,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build UiPath NuGet Package
-        # This action packs your UiPath project into a NuGet package (.nupkg)
-        uses: uipath/actions/pack-project-to-nuget-package@v1 # Official UiPath Action
+        # IMPORTANT: Changed @v1 to @v1.0.10
+        uses: uipath/actions/pack-project-to-nuget-package@v1.0.10 
         with:
           project-path: ${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json # Path to your project.json
           output-path: ${{ github.workspace }}\package # Folder where the .nupkg will be created
           package-version: auto # Automatically increments package version
 
       - name: Upload UiPath Artifact (NuGet package)
-        # This step saves the generated .nupkg file as a workflow artifact.
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PROJECT_NAME }}.nupkg
           path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
 
       - name: Deploy Nuget Package to Orchestrator Development Folder
-        # This action deploys the generated NuGet package to your Orchestrator
-        uses: uipath/actions/deploy-package-to-orchestrator@v1 # Official UiPath Action
+        # IMPORTANT: Changed @v1 to @v1.0.10
+        uses: uipath/actions/deploy-package-to-orchestrator@v1.0.10 
         with:
           orchestrator-url: ${{ env.ORCH_URL }}
           tenant-name: ${{ env.ORCH_TENANT }}
@@ -52,8 +50,3 @@ jobs:
           package-path: ${{ github.workspace }}\package # Folder where the .nupkg is located
           process-name: ${{ env.PROJECT_NAME }} # Name of the process to update/create (usually same as project name)
           # Optional: process-type: Attended / Unattended (default is Unattended)
-
-  # --- The 'test-published-package' job has been removed for now. ---
-  # You can add it back later once you have a Test Set configured in Orchestrator.
-  # When you do, uncomment or re-add the job exactly as it was provided in the previous response,
-  # and make sure to replace 'YOUR_TEST_SET_NAME' with the actual name of your Test Set.
