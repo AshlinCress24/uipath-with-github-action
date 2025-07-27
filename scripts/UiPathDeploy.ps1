@@ -1,5 +1,3 @@
-# scripts/UiPathDeploy.ps1
-
 param(
     [string]$packages_path,
     [string]$orchestrator_url,
