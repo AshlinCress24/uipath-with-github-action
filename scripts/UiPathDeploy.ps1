@@ -32,34 +32,52 @@ if (-not $nupkgFile) {
 $nupkgFullPath = $nupkgFile.FullName
 Write-Host "Found package: $nupkgFullPath"
 
-Write-Host "Authenticating to Orchestrator..."
-$authArgs = @(
-    "identity", "auth", "client-credentials",
-    "--url", "$orchestrator_url",
-    "--organization-name", "$organization_name",
-    "--tenant", "$orchestrator_tenant",
-    "--client-id", "$client_id",
-    "--client-secret", "$client_secret",
-    # --- ADDED THIS LINE ---
-    "--identity-uri", "$orchestrator_url" # Explicitly set identity URI
-)
+# --- NEW AUTHENTICATION STRATEGY: Create .uipath/config file ---
+Write-Host "Attempting authentication by creating UiPath CLI config file..."
 
-Write-Host "Auth command string being passed (full path): '$uipathCliExecutable $($authArgs -join ' ')'"
+# Determine the correct home directory for the .uipath folder
+# On Windows, $env:HOME usually resolves to C:\Users\<YourUser> or similar
+$uipathConfigDir = Join-Path $env:HOME ".uipath"
 
-# Change directory before executing, as a robust measure
-$originalLocation = Get-Location
-Set-Location $uipathCliDir
+if (-not (Test-Path $uipathConfigDir)) {
+    Write-Host "Creating .uipath configuration directory: $uipathConfigDir"
+    New-Item -ItemType Directory -Path $uipathConfigDir | Out-Null
+} else {
+    Write-Host "UiPath configuration directory already exists: $uipathConfigDir"
+}
 
-# Execute uipath.exe from its directory
-& ".\uipath.exe" $authArgs
+# Construct the content for the config file.
+# Using a here-string for multi-line content.
+$configFileContent = @"
+profiles:
+  - name: default
+    organization: "$organization_name"
+    tenant: "$orchestrator_tenant"
+    auth:
+      clientId: "$client_id"
+      clientSecret: "$client_secret"
+"@
 
-# Change back to original location
-Set-Location $originalLocation
+$configFilePath = Join-Path $uipathConfigDir "config"
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI authentication failed with exit code $LASTEXITCODE"
+# Write the config file
+Write-Host "Writing UiPath CLI config file to: $configFilePath"
+Set-Content -Path $configFilePath -Value $configFileContent -Force
+
+# Verify config file creation (optional, but good for debugging)
+if (Test-Path $configFilePath) {
+    Write-Host "UiPath CLI config file created successfully."
+    # For debugging, you can uncomment the next line to see the content.
+    # Be cautious with secrets in logs!
+    # Write-Host "Config file content:"
+    # Get-Content $configFilePath | Write-Host
+} else {
+    Write-Error "Failed to create UiPath CLI config file."
     exit 1
 }
+
+Write-Host "Proceeding with Orchestrator operations using configured credentials."
+# --- END NEW AUTHENTICATION STRATEGY ---
 
 Write-Host "Publishing package to Orchestrator folder: $folder_organization_unit"
 $publishArgs = @(
@@ -68,9 +86,9 @@ $publishArgs = @(
     "--folder-path", "$folder_organization_unit"
 )
 
-Write-Host "Publish command string being passed (full path): '$uipathCliExecutable $($publishArgs -join ' ')'"
+Write-Host "Publish command string being passed: '$uipathCliExecutable $($publishArgs -join ' ')'"
 
-# Change directory before executing, as a robust measure
+# Temporarily change directory to where uipath.exe is located for execution robustness
 $originalLocation = Get-Location
 Set-Location $uipathCliDir
 
