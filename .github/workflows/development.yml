@@ -47,7 +47,6 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      # MANUAL CLI SETUP START - Replacing uses: UiPath/setup-uipath-cli@v2
       - name: Manually Setup UiPath CLI
         shell: pwsh
         run: |
@@ -61,12 +60,29 @@ jobs:
           Write-Host "Extracting UiPath CLI to $installPath"
           Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
           
-          # We still add to GITHUB_PATH as a good practice, but the scripts will now use the full path
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
-      # MANUAL CLI SETUP END
-
-      # The verify step is removed, as scripts will now use the full path directly
+      
+      # --- ADD THIS NEW DIAGNOSTIC STEP HERE ---
+      - name: Verify Extracted CLI Content
+        shell: pwsh
+        run: |
+          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          Write-Host "Listing contents of $cliDir:"
+          Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
+          
+          # Optional: Verify the file exists and is an executable
+          $cliExePath = Join-Path $cliDir "uipcli.exe"
+          if (Test-Path $cliExePath) {
+              Write-Host "$cliExePath exists!"
+              # Attempt to run it directly with its full path for a test
+              Write-Host "Attempting to run $cliExePath --version directly:"
+              & $cliExePath --version
+          } else {
+              Write-Error "$cliExePath NOT FOUND!"
+              exit 1
+          }
+      # --- END NEW DIAGNOSTIC STEP ---
 
       - name: Build Nuget Package
         shell: pwsh
@@ -90,7 +106,6 @@ jobs:
         with:
           name: Artifacts
       
-      # MANUAL CLI SETUP START - Replacing uses: UiPath/setup-uipath-cli@v2
       - name: Manually Setup UiPath CLI
         shell: pwsh
         run: |
@@ -106,9 +121,25 @@ jobs:
           
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
-      # MANUAL CLI SETUP END
 
-      # The verify step is removed
+      # --- ADD THIS NEW DIAGNOSTIC STEP HERE AS WELL ---
+      - name: Verify Extracted CLI Content (Publish Job)
+        shell: pwsh
+        run: |
+          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          Write-Host "Listing contents of $cliDir:"
+          Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
+          
+          $cliExePath = Join-Path $cliDir "uipcli.exe"
+          if (Test-Path $cliExePath) {
+              Write-Host "$cliExePath exists!"
+              Write-Host "Attempting to run $cliExePath --version directly:"
+              & $cliExePath --version
+          } else {
+              Write-Error "$cliExePath NOT FOUND!"
+              exit 1
+          }
+      # --- END NEW DIAGNOSTIC STEP ---
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
