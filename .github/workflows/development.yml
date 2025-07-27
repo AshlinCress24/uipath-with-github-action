@@ -47,39 +47,37 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      - name: Manually Setup UiPath CLI (Direct Download & Extract)
+      - name: Manually Setup UiPath CLI (Direct Download & Extract via Activities Package)
         shell: pwsh
         run: |
           $cliDir = "${{ github.workspace }}\uipathcli"
           $installPath = $cliDir # Base directory for CLI installation
-          $cliPackageId = "UiPath.CLI" 
-          $cliPackageVersion = "23.4.1" 
-          
-          # Direct download URL for the .nupkg from MyGet
-          $nupkgDownloadUrl = "https://www.myget.org/F/uipath/api/v2/package/$cliPackageId/$cliPackageVersion"
+          # Use UiPath.Automation.Cloud.Activities to get uipcli.exe
+          $activitiesPackageId = "UiPath.Automation.Cloud.Activities" 
+          $activitiesPackageVersion = "1.21.0" # This version is known to contain uipcli.exe
+
+          # Direct download URL for the .nupkg from nuget.org
+          $nupkgDownloadUrl = "https://www.nuget.org/api/v2/package/$activitiesPackageId/$activitiesPackageVersion"
           # Path where the .nupkg will be saved
-          $downloadedNupkgPath = Join-Path $installPath "$cliPackageId.$cliPackageVersion.nupkg"
-          # Path where the content of the .nupkg will be extracted (e.g., D:\a\...\uipathcli\UiPath.CLI.23.4.1)
-          $extractedPackageDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion" 
+          $downloadedNupkgPath = Join-Path $installPath "$activitiesPackageId.$activitiesPackageVersion.nupkg"
+          # Path where the content of the .nupkg will be extracted
+          $extractedPackageDir = Join-Path $installPath "$activitiesPackageId.$activitiesPackageVersion" 
           # Expected path to uipcli.exe within the extracted package
           $cliExePath = Join-Path $extractedPackageDir "tools\uipcli.exe" 
 
           Write-Host "Creating CLI directory: $installPath"
           New-Item -ItemType Directory -Path $installPath -Force | Out-Null
 
-          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from $nupkgDownloadUrl to $downloadedNupkgPath"
-          # Download the .nupkg file
-          # -UseBasicParsing is often needed for Invoke-WebRequest in CI environments
+          Write-Host "Downloading UiPath Activities package '$activitiesPackageId' v$activitiesPackageVersion from $nupkgDownloadUrl to $downloadedNupkgPath"
           Invoke-WebRequest -Uri $nupkgDownloadUrl -OutFile $downloadedNupkgPath -UseBasicParsing
 
           # Check if download was successful
           if (-not (Test-Path $downloadedNupkgPath)) {
-              Write-Error "Failed to download $cliPackageId.$cliPackageVersion.nupkg. Exiting."
+              Write-Error "Failed to download $activitiesPackageId.$activitiesPackageVersion.nupkg. Exiting."
               exit 1
           }
 
           Write-Host "Extracting $downloadedNupkgPath to $extractedPackageDir"
-          # .nupkg files are just .zip files, so we can rename and extract
           Rename-Item -Path $downloadedNupkgPath -NewName "$downloadedNupkgPath.zip"
           Expand-Archive -Path "$downloadedNupkgPath.zip" -DestinationPath $extractedPackageDir -Force
 
@@ -87,7 +85,6 @@ jobs:
           $extractedCliToolsDir = Join-Path $extractedPackageDir "tools"
 
           Write-Host "Adding UiPath CLI tools directory to PATH: $extractedCliToolsDir"
-          # Add the tools directory to the GitHub Actions PATH for the current job
           Add-Content -Path $env:GITHUB_PATH -Value $extractedCliToolsDir
 
           Write-Host "Verifying uipcli.exe presence and version..."
@@ -98,7 +95,6 @@ jobs:
           } else {
               Write-Error "uipcli.exe not found after extraction! Expected at: $cliExePath"
               # List directory contents for debugging if uipcli.exe is still not found
-              # FIX: Use ${} for variable delimitation
               Write-Host "Listing contents of ${extractedPackageDir}:" 
               Get-ChildItem -Path $extractedPackageDir -Recurse -Force | Format-Table -AutoSize
               exit 1
@@ -107,13 +103,129 @@ jobs:
       - name: Verify Extracted CLI Content and Commands (Diagnostic)
         shell: pwsh
         run: |
-          # The path is already in GITHUB_PATH from the previous step, so uipcli.exe should be directly executable.
-          # However, for explicit checks and to match the scripts' expected paths, we use the full path.
+          # Note: The path below needs to be updated to reflect UiPath.Automation.Cloud.Activities
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.23.4.1\tools\uipcli.exe" 
+          $cliExePath = Join-Path $cliDir "UiPath.Automation.Cloud.Activities.1.21.0\tools\uipcli.exe" 
           
-          # FIX: Use ${} for variable delimitation
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
-          if (
+          if (Test-Path $cliExePath) {
+              Write-Host "${cliExePath} exists!"
+              Write-Host "Running '${cliExePath} --version':"
+              & $cliExePath --version
+              Write-Host "Running '${cliExePath} --help':"
+              & $cliExePath --help
+          } else {
+              Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
+              exit 1
+          }
+
+      - name: Build Nuget Package
+        shell: pwsh
+        run: |
+          # This script uses the uipcli.exe located in the PATH as well as explicitly.
+          # The paths within the script are designed to find it.
+          "${{ github.workspace }}\scripts\UiPathPack.ps1" `
+          -project_path "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\${{ env.PROJECT_NAME }}\project.json" `
+          -output_path "${{ github.workspace }}\package"
+
+      - name: Upload UiPath Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Artifacts
+          path: |
+            package/*.*
+            scripts/*.ps1
+
+  publish-uipath-nuget-package:
+    needs: build-uipath-nuget-package
+    runs-on: windows-latest
+    steps:
+      - name: Download UiPath Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Artifacts
+      
+      - name: Manually Setup UiPath CLI (Direct Download & Extract for Publish Job)
+        shell: pwsh
+        run: |
+          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli" 
+          $installPath = $cliDir 
+          # Use UiPath.Automation.Cloud.Activities to get uipcli.exe
+          $activitiesPackageId = "UiPath.Automation.Cloud.Activities" 
+          $activitiesPackageVersion = "1.21.0" 
+
+          # Direct download URL for the .nupkg from nuget.org
+          $nupkgDownloadUrl = "https://www.nuget.org/api/v2/package/$activitiesPackageId/$activitiesPackageVersion"
+          $downloadedNupkgPath = Join-Path $installPath "$activitiesPackageId.$activitiesPackageVersion.nupkg"
+          $extractedPackageDir = Join-Path $installPath "$activitiesPackageId.$activitiesPackageVersion" 
+          $cliExePath = Join-Path $extractedPackageDir "tools\uipcli.exe" 
+
+          Write-Host "Creating CLI directory: $installPath"
+          New-Item -ItemType Directory -Path $installPath -Force | Out-Null
+
+          Write-Host "Downloading UiPath Activities package '$activitiesPackageId' v$activitiesPackageVersion from $nupkgDownloadUrl to $downloadedNupkgPath"
+          Invoke-WebRequest -Uri $nupkgDownloadUrl -OutFile $downloadedNupkgPath -UseBasicParsing
+
+          if (-not (Test-Path $downloadedNupkgPath)) {
+              Write-Error "Failed to download $activitiesPackageId.$activitiesPackageVersion.nupkg. Exiting."
+              exit 1
+          }
+
+          Write-Host "Extracting $downloadedNupkgPath to $extractedPackageDir"
+          Rename-Item -Path $downloadedNupkgPath -NewName "$downloadedNupkgPath.zip"
+          Expand-Archive -Path "$downloadedNupkgPath.zip" -DestinationPath $extractedPackageDir -Force
+
+          $extractedCliToolsDir = Join-Path $extractedPackageDir "tools"
+
+          Write-Host "Adding UiPath CLI tools directory to PATH: $extractedCliToolsDir"
+          Add-Content -Path $env:GITHUB_PATH -Value $extractedCliToolsDir
+
+      - name: Verify Extracted CLI Content and Commands (Publish Job - Diagnostic)
+        shell: pwsh
+        run: |
+          # Note: The path below needs to be updated to reflect UiPath.Automation.Cloud.Activities
+          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          $cliExePath = Join-Path $cliDir "UiPath.Automation.Cloud.Activities.1.21.0\tools\uipcli.exe" 
+          
+          Write-Host "Listing contents of ${cliDir}:"
+          Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
+          
+          if (Test-Path $cliExePath) {
+              Write-Host "${cliExePath} exists!"
+              Write-Host "Running '${cliExePath} --version':"
+              & $cliExePath --version
+              Write-Host "Running '${cliExePath} --help':"
+              & $cliExePath --help
+          } else {
+              Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
+              exit 1
+          }
+
+      - name: Publish Nuget Package to DEV
+        shell: pwsh
+        run: |
+          # This script uses the uipcli.exe located in the PATH as well as explicitly.
+          "${{ github.workspace }}\scripts\UiPathDeploy.ps1" `
+          -packages_path "${{ github.workspace }}\package" `
+          -orchestrator_url "${{ env.ORCH_URL }}" `
+          -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
+          -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
+          -client_id "${{ env.ORCH_CLIENT_ID }}" `
+          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
+          -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}"
+
+  create-pull-request:
+    needs: publish-uipath-nuget-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: pull-request
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: "master"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_label: "feature, automated pr"
+          pr_title: "Pull Request From Github Action"
