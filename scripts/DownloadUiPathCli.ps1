@@ -1,52 +1,168 @@
-# scripts/DownloadUiPathCli.ps1
+##[debug]Evaluating condition for step: 'Verify UiPath CLI Contents and Version (Build Job)'
+##[debug]Evaluating: success()
+##[debug]Evaluating success:
+##[debug]=> true
+##[debug]Result: true
+##[debug]Starting: Verify UiPath CLI Contents and Version (Build Job)
+##[debug]Loading inputs
+##[debug]Evaluating: format('Write-Host "Listing contents of UiPath CLI directory:"
+##[debug]Get-ChildItem -Path "{0}\uipathcli" -Recurse -Force | Format-Table -AutoSize
+##[debug]
+##[debug]# Construct the full path to the executable explicitly
+##[debug]$cli_dir = Join-Path "{1}" "uipathcli"
+##[debug]$cli_full_path = Join-Path $cli_dir "uipath.exe" # Assuming uipath.exe is directly in uipathcli folder
+##[debug]
+##[debug]if (Test-Path $cli_full_path -PathType Leaf) {{ # Check if the file actually exists and is a file
+##[debug]    Write-Host "UiPath CLI executable found at: $cli_full_path"
+##[debug]    Write-Host "Running ''$cli_full_path --help'' to check commands..."
+##[debug]    & "$cli_full_path" --help
+##[debug]    Write-Host "Running ''$cli_full_path -v'' to check version..."
+##[debug]    # The correct flag for version is often --version or -v in newer CLIs.
+##[debug]    # Use a try-catch for -v as it previously indicated error.
+##[debug]    try {{
+##[debug]      & "$cli_full_path" -v
+##[debug]    }} catch {{
+##[debug]      Write-Host "Warning: ''$cli_full_path -v'' failed. Trying ''$cli_full_path --version''..."
+##[debug]      & "$cli_full_path" --version
+##[debug]    }}
+##[debug]}} else {{
+##[debug]    Write-Error "UiPath CLI executable ''uipath.exe'' not found at expected path: $cli_full_path"
+##[debug]    exit 1
+##[debug]}}
+##[debug]', github.workspace, github.workspace)
+##[debug]Evaluating format:
+##[debug]..Evaluating String:
+##[debug]..=> 'Write-Host "Listing contents of UiPath CLI directory:"
+##[debug]Get-ChildItem -Path "{0}\uipathcli" -Recurse -Force | Format-Table -AutoSize
+##[debug]
+##[debug]# Construct the full path to the executable explicitly
+##[debug]$cli_dir = Join-Path "{1}" "uipathcli"
+##[debug]$cli_full_path = Join-Path $cli_dir "uipath.exe" # Assuming uipath.exe is directly in uipathcli folder
+##[debug]
+##[debug]if (Test-Path $cli_full_path -PathType Leaf) {{ # Check if the file actually exists and is a file
+##[debug]    Write-Host "UiPath CLI executable found at: $cli_full_path"
+##[debug]    Write-Host "Running ''$cli_full_path --help'' to check commands..."
+##[debug]    & "$cli_full_path" --help
+##[debug]    Write-Host "Running ''$cli_full_path -v'' to check version..."
+##[debug]    # The correct flag for version is often --version or -v in newer CLIs.
+##[debug]    # Use a try-catch for -v as it previously indicated error.
+##[debug]    try {{
+##[debug]      & "$cli_full_path" -v
+##[debug]    }} catch {{
+##[debug]      Write-Host "Warning: ''$cli_full_path -v'' failed. Trying ''$cli_full_path --version''..."
+##[debug]      & "$cli_full_path" --version
+##[debug]    }}
+##[debug]}} else {{
+##[debug]    Write-Error "UiPath CLI executable ''uipath.exe'' not found at expected path: $cli_full_path"
+##[debug]    exit 1
+##[debug]}}
+##[debug]'
+##[debug]..Evaluating Index:
+##[debug]....Evaluating github:
+##[debug]....=> Object
+##[debug]....Evaluating String:
+##[debug]....=> 'workspace'
+##[debug]..=> 'D:\a\uipath-with-github-action\uipath-with-github-action'
+##[debug]..Evaluating Index:
+##[debug]....Evaluating github:
+##[debug]....=> Object
+##[debug]....Evaluating String:
+##[debug]....=> 'workspace'
+##[debug]..=> 'D:\a\uipath-with-github-action\uipath-with-github-action'
+##[debug]=> 'Write-Host "Listing contents of UiPath CLI directory:"
+##[debug]Get-ChildItem -Path "D:\a\uipath-with-github-action\uipath-with-github-action\uipathcli" -Recurse -Force | Format-Table -AutoSize
+##[debug]
+##[debug]# Construct the full path to the executable explicitly
+##[debug]$cli_dir = Join-Path "D:\a\uipath-with-github-action\uipath-with-github-action" "uipathcli"
+##[debug]$cli_full_path = Join-Path $cli_dir "uipath.exe" # Assuming uipath.exe is directly in uipathcli folder
+##[debug]
+##[debug]if (Test-Path $cli_full_path -PathType Leaf) { # Check if the file actually exists and is a file
+##[debug]    Write-Host "UiPath CLI executable found at: $cli_full_path"
+##[debug]    Write-Host "Running ''$cli_full_path --help'' to check commands..."
+##[debug]    & "$cli_full_path" --help
+##[debug]    Write-Host "Running ''$cli_full_path -v'' to check version..."
+##[debug]    # The correct flag for version is often --version or -v in newer CLIs.
+##[debug]    # Use a try-catch for -v as it previously indicated error.
+##[debug]    try {
+##[debug]      & "$cli_full_path" -v
+##[debug]    } catch {
+##[debug]      Write-Host "Warning: ''$cli_full_path -v'' failed. Trying ''$cli_full_path --version''..."
+##[debug]      & "$cli_full_path" --version
+##[debug]    }
+##[debug]} else {
+##[debug]    Write-Error "UiPath CLI executable ''uipath.exe'' not found at expected path: $cli_full_path"
+##[debug]    exit 1
+##[debug]}
+##[debug]'
+##[debug]Result: 'Write-Host "Listing contents of UiPath CLI directory:"
+##[debug]Get-ChildItem -Path "D:\a\uipath-with-github-action\uipath-with-github-action\uipathcli" -Recurse -Force | Format-Table -AutoSize
+##[debug]
+##[debug]# Construct the full path to the executable explicitly
+##[debug]$cli_dir = Join-Path "D:\a\uipath-with-github-action\uipath-with-github-action" "uipathcli"
+##[debug]$cli_full_path = Join-Path $cli_dir "uipath.exe" # Assuming uipath.exe is directly in uipathcli folder
+##[debug]
+##[debug]if (Test-Path $cli_full_path -PathType Leaf) { # Check if the file actually exists and is a file
+##[debug]    Write-Host "UiPath CLI executable found at: $cli_full_path"
+##[debug]    Write-Host "Running ''$cli_full_path --help'' to check commands..."
+##[debug]    & "$cli_full_path" --help
+##[debug]    Write-Host "Running ''$cli_full_path -v'' to check version..."
+##[debug]    # The correct flag for version is often --version or -v in newer CLIs.
+##[debug]    # Use a try-catch for -v as it previously indicated error.
+##[debug]    try {
+##[debug]      & "$cli_full_path" -v
+##[debug]    } catch {
+##[debug]      Write-Host "Warning: ''$cli_full_path -v'' failed. Trying ''$cli_full_path --version''..."
+##[debug]      & "$cli_full_path" --version
+##[debug]    }
+##[debug]} else {
+##[debug]    Write-Error "UiPath CLI executable ''uipath.exe'' not found at expected path: $cli_full_path"
+##[debug]    exit 1
+##[debug]}
+##[debug]'
+##[debug]Loading env
+Run Write-Host "Listing contents of UiPath CLI directory:"
+##[debug]C:\Program Files\PowerShell\7\pwsh.EXE -command ". 'D:\a\_temp\25ed4946-42b4-44e7-9619-d419c5583bf6.ps1'"
+Listing contents of UiPath CLI directory:
 
-param(
-    [string]$WorkspacePath
-)
+    Directory: D:\a\uipath-with-github-action\uipath-with-github-action\uipathcli
 
-# Define the target directory for the UiPath CLI
-$cliDir = Join-Path $WorkspacePath "uipathcli"
+Mode        LastWriteTime   Length Name
+----        -------------   ------ ----
+-a---  7/27/2025 10:59 AM  9952177 uipath.cli.zip
+-a---  6/24/2025  2:41 PM 20114944 uipath.exe
 
-# Define the UiPath CLI download URL from GitHub releases (recommended for latest public CLI)
-# This link directly points to the latest Windows AMD64 build from the official UiPath CLI GitHub repo.
-$cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
-$zipFilePath = Join-Path $cliDir "uipath.cli.zip" # Using a generic name for the downloaded zip
-$cliExecutableName = "uipath.exe" # Name of the executable inside the zip (expected after extraction)
+UiPath CLI executable found at: D:\a\uipath-with-github-action\uipath-with-github-action\uipathcli\uipath.exe
+Running 'D:\a\uipath-with-github-action\uipath-with-github-action\uipathcli\uipath.exe --help' to check commands...
+NAME:
+   uipath - Command-Line Interface for UiPath Services
 
-Write-Host "Downloading UiPath CLI from $cliDownloadUrl (latest Windows AMD64 release)..."
+USAGE:
+   uipath <service> <operation> --<argument> <value>
 
-try {
-    # --- IMPORTANT CHANGE: Clean up any existing CLI folder to ensure a fresh download and extraction ---
-    if (Test-Path $cliDir -PathType Container) {
-        Write-Host "Removing existing UiPath CLI directory: $cliDir"
-        Remove-Item -Path $cliDir -Recurse -Force -ErrorAction Stop # Added -ErrorAction Stop for better error handling
-    }
+COMMANDS:
+   du            Document Understanding
+   identity      Identity Server
+   orchestrator  UiPath Orchestrator
+   studio        UiPath Studio
+   autocomplete  Autocompletion
+   config        Interactive Configuration
 
-    # Create the directory
-    New-Item -ItemType Directory -Path $cliDir -Force | Out-Null
-    Write-Host "Created directory: $cliDir"
-
-    # Download the ZIP file
-    Invoke-WebRequest -Uri $cliDownloadUrl -OutFile $zipFilePath -UseBasicParsing -ErrorAction Stop
-
-    Write-Host "Successfully downloaded UiPath CLI to $zipFilePath."
-
-    # Extract the ZIP file
-    Expand-Archive -Path $zipFilePath -DestinationPath $cliDir -Force -ErrorAction Stop
-
-    Write-Host "Successfully extracted UiPath CLI to $cliDir."
-
-    # Add the CLI directory to the PATH for the current job
-    $env:Path += ";$cliDir"
-    Write-Host "Added '$cliDir' to PATH for this session."
-
-    # Make the executable name available to subsequent steps via GITHUB_ENV
-    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=$cliExecutableName"
-    Write-Host "Set UIPATH_CLI_EXECUTABLE_NAME to '$cliExecutableName' in GITHUB_ENV."
-
-} catch {
-    Write-Error ("Failed to download or setup UiPath CLI: " + $_.Exception.Message)
-    exit 1
-}
-
-Write-Host "UiPath CLI Setup completed."
+GLOBAL OPTIONS:
+   --debug                  Enable debug output (default: false) [%UIPATH_DEBUG%]
+   --profile value          Config profile to use (default: "default") [%UIPATH_PROFILE%]
+   --uri value              Server Base-URI [%UIPATH_URI%]
+   --organization value     Organization name [%UIPATH_ORGANIZATION%]
+   --tenant value           Tenant name [%UIPATH_TENANT%]
+   --insecure               Disable HTTPS certificate check (default: false) [%UIPATH_INSECURE%]
+   --output value           Set output format: json (default), text [%UIPATH_OUTPUT%]
+   --query value            Perform JMESPath query on output
+   --wait value             Waits for the provided condition (JMESPath expression)
+   --wait-timeout value     Time to wait in seconds for condition (default: 30)
+   --file value             Provide input from file (use - for stdin)
+   --identity-uri value     Identity Server URI [%UIPATH_IDENTITY_URI%]
+   --service-version value  Specific service version [%UIPATH_SERVICE_VERSION%]
+   --help, -h               show help
+Running 'D:\a\uipath-with-github-action\uipath-with-github-action\uipathcli\uipath.exe -v' to check version...
+Incorrect usage: flag provided but not defined: -v
+Error: Process completed with exit code 1.
+##[debug]Finishing: Verify UiPath CLI Contents and Version (Build Job)
