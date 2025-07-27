@@ -1,108 +1,88 @@
+# scripts/UiPathDeploy.ps1
+
 param(
-    [Parameter(Mandatory=$true)]
     [string]$packages_path,
-
-    [Parameter(Mandatory=$true)]
     [string]$orchestrator_url,
-
-    [Parameter(Mandatory=$true)]
     [string]$organization_name,
-
-    [Parameter(Mandatory=$true)]
     [string]$orchestrator_tenant,
-
-    [Parameter(Mandatory=$true)]
     [string]$client_id,
-
-    [Parameter(Mandatory=$true)]
     [string]$client_secret,
-
-    [Parameter(Mandatory=$true)]
-    [string]$folder_organization_unit,
-
-    [Parameter(Mandatory=$true)]
-    [string]$cli_executable_name # This will now always be "uipath.cli.exe"
+    [string]$folder_organization_unit
+    # $cli_executable_name parameter is explicitly REMOVED from the param block here.
 )
+
+# Define cli_executable_name directly from the environment variable set by DownloadUiPathCli.ps1
+$cli_executable_name = $env:UIPATH_CLI_EXECUTABLE_NAME
 
 Write-Host "Starting UiPath Deploy Script (using $cli_executable_name)..."
+Write-Host "Packages Path: $packages_path"
+Write-Host "Orchestrator URL: $orchestrator_url"
+Write-Host "Organization Name: $organization_name"
+Write-Host "Orchestrator Tenant: $orchestrator_tenant"
+Write-Host "Deployment Folder (Orchestrator Unit): $folder_organization_unit"
 
-# The CLI executable should be in PATH
-$uipathCliExecutable = $cli_executable_name
+# Validate CLI executable
+$cli_path = Get-Command $cli_executable_name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+if (-not $cli_path) {
+    Write-Error "UiPath CLI executable '$cli_executable_name' not found in PATH for deployment."
+    exit 1
+}
+Write-Host "UiPath CLI Executable: $cli_path"
+Write-Host "$cli_executable_name found in PATH."
 
-Write-Host "UiPath CLI Executable: $uipathCliExecutable"
-
-# Verify CLI existence in PATH
 try {
-    Get-Command $uipathCliExecutable -ErrorAction Stop | Out-Null
-    Write-Host "$uipathCliExecutable found in PATH."
+    # 1. Login to UiPath Cloud Orchestrator
+    Write-Host "Logging in to UiPath Orchestrator..."
+    & $cli_executable_name auth login `
+        --url "$orchestrator_url" `
+        --organization-name "$organization_name" `
+        --tenant-name "$orchestrator_tenant" `
+        --client-id "$client_id" `
+        --client-secret "$client_secret"
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "UiPath CLI login failed with exit code $LASTEXITCODE."
+        exit 1
+    }
+    Write-Host "Successfully logged in to Orchestrator."
+
+    # 2. Find the .nupkg package to deploy
+    $package_file = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Select-Object -ExpandProperty FullName
+    if (-not $package_file) {
+        Write-Error "No .nupkg file found in '$packages_path'."
+        exit 1
+    }
+    if ($package_file.Count -gt 1) {
+        Write-Warning "More than one .nupkg file found in '$packages_path'. Deploying the first one found: $($package_file[0])"
+        $package_file = $package_file[0]
+    } else {
+        Write-Host "Found package: $package_file"
+    }
+
+    # 3. Publish (Deploy) the package to the specified Orchestrator folder
+    Write-Host "Publishing package '$package_file' to Orchestrator folder '$folder_organization_unit'..."
+    & $cli_executable_name package deploy `
+        --path "$package_file" `
+        --folder-path "$folder_organization_unit"
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "UiPath CLI package deploy failed with exit code $LASTEXITCODE."
+        exit 1
+    }
+    Write-Host "Successfully deployed package."
+
 } catch {
-    Write-Error "$uipathCliExecutable not found in PATH. Make sure the setup process successfully installed it and added it to PATH."
+    Write-Error ("Error deploying UiPath project: " + $_.Exception.Message)
     exit 1
+} finally {
+    # Always attempt to logout, even if deployment fails
+    Write-Host "Attempting to logout from UiPath Orchestrator..."
+    & $cli_executable_name auth logout -Force
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "UiPath CLI logout command failed with exit code $LASTEXITCODE, but deployment process completed."
+    } else {
+        Write-Host "Successfully logged out."
+    }
 }
 
-# 1. Login to Orchestrator (using v2.x CLI syntax)
-Write-Host "Attempting to login to Orchestrator at $orchestrator_url using $uipathCliExecutable..."
-
-Write-Host "Using uipath.cli.exe (v2) syntax for 'orchestrator login'..."
-$loginArgs = @(
-    "orchestrator",
-    "login",
-    "--url", $orchestrator_url,
-    "--organization-name", $organization_name,
-    "--tenant-name", $orchestrator_tenant,
-    "--client-id", $client_id,
-    "--client-secret", $client_secret
-)
-
-& $uipathCliExecutable $loginArgs
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'orchestrator login' command failed with exit code $LASTEXITCODE."
-    exit $LASTEXITCODE
-} else {
-    Write-Host "Successfully logged in to UiPath Orchestrator using $uipathCliExecutable."
-}
-
-# 2. Publish the NuGet package
-Write-Host "Searching for packages in: $packages_path"
-$packageFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Select-Object -First 1
-
-if ($null -eq $packageFile) {
-    Write-Error "No .nupkg file found in $packages_path. Exiting."
-    exit 1
-}
-
-$packagePath = $packageFile.FullName
-Write-Host "Found package: $packagePath"
-
-Write-Host "Attempting to publish package to folder: $folder_organization_unit using $uipathCliExecutable..."
-
-# Publish command syntax (using v2.x CLI syntax)
-Write-Host "Using uipath.cli.exe (v2) syntax for 'orchestrator publish'..."
-$publishArgs = @(
-    "orchestrator",
-    "publish",
-    "--file", $packagePath,
-    "--folder", $folder_organization_unit
-)
-
-& $uipathCliExecutable $publishArgs
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'orchestrator publish' command failed with exit code $LASTEXITCODE."
-    exit $LASTEXITCODE
-} else {
-    Write-Host "UiPath package published successfully using $uipathCliExecutable."
-}
-
-# 3. Logout (optional, but good practice)
-Write-Host "Logging out from UiPath Orchestrator using $uipathCliExecutable..."
-& $uipathCliExecutable orchestrator logout
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "UiPath CLI 'orchestrator logout' command failed with exit code $LASTEXITCODE. Proceeding anyway."
-} else {
-    Write-Host "Successfully logged out from UiPath Orchestrator using $uipathCliExecutable."
-}
-
-Write-Host "Finished UiPath Deploy Script."
+Write-Host "UiPath Deploy Script completed."
