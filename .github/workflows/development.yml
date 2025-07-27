@@ -19,16 +19,31 @@ jobs:
       - name: Download UiPath CLI and Pack Project
         shell: pwsh
         run: |
-          # Download UiPath CLI and prepare environment
-          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
+          $cliDirNamePattern = "uipathcli_*"
+          $workspace = "${{ github.workspace }}"
 
-          # Explicitly set environment variable (since $GITHUB_ENV changes do NOT apply within the same step)
+          Write-Host "Downloading UiPath CLI..."
+          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath $workspace
+
+          Write-Host "Locating extracted UiPath CLI directory..."
+          $cliDir = Get-ChildItem -Path $workspace -Directory | Where-Object { $_.Name -like $cliDirNamePattern } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+          if (-not $cliDir) {
+            Write-Error "Cannot find UiPath CLI directory after download."
+            exit 1
+          }
+          Write-Host "Found UiPath CLI directory: $($cliDir.FullName)"
+
+          Write-Host "Adding CLI directory to PATH for current session..."
+          $env:Path = "$($cliDir.FullName);$env:Path"
+
+          Write-Host "Setting UIPATH_CLI_EXECUTABLE_NAME environment variable..."
           $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
 
-          # Run the pack script
+          Write-Host "Starting UiPath Pack..."
           pwsh ./scripts/UiPathPack.ps1 `
-            -project_path "${{ github.workspace }}/project.json" `
-            -output_path "${{ github.workspace }}/output_packages"
+            -project_path "$workspace/project.json" `
+            -output_path "$workspace/output_packages"
 
       - name: Upload UiPath Package as Artifact
         uses: actions/upload-artifact@v4
@@ -53,14 +68,26 @@ jobs:
           ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
           ORCH_URL: ${{ secrets.ORCH_URL }}
         run: |
-          # Download UiPath CLI
-          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
+          $cliDirNamePattern = "uipathcli_*"
+          $workspace = "${{ github.workspace }}"
 
-          # Set the environment variable
+          Write-Host "Downloading UiPath CLI..."
+          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath $workspace
+
+          Write-Host "Locating extracted UiPath CLI directory..."
+          $cliDir = Get-ChildItem -Path $workspace -Directory | Where-Object { $_.Name -like $cliDirNamePattern } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+          if (-not $cliDir) {
+            Write-Error "Cannot find UiPath CLI directory after download."
+            exit 1
+          }
+          Write-Host "Found UiPath CLI directory: $($cliDir.FullName)"
+
+          Write-Host "Adding CLI directory to PATH for current session..."
+          $env:Path = "$($cliDir.FullName);$env:Path"
+
+          Write-Host "Setting UIPATH_CLI_EXECUTABLE_NAME environment variable..."
           $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
-
-          # Download the package artifact
-          pwsh -Command "Write-Host 'Downloading artifacts...'"
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
