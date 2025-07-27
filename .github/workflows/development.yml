@@ -55,7 +55,7 @@ jobs:
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
           Write-Host "Current working directory: $(Get-Location)"
           Write-Host "Listing contents of 'scripts' directory:"
-          Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize # Diagnostic line
+          Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize # Diagnostic line (can be removed later)
           Write-Host "Attempting to execute DownloadUiPathCli.ps1..."
           .\scripts\DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
 
@@ -65,9 +65,9 @@ jobs:
           # Temporarily bypass execution policy for the session
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
           .\scripts\UiPathPack.ps1 `
-          -project_path "${{ github.workspace }}/project.json" ` # <--- FIXED PATH FOR ROOT-LEVEL PROJECT.JSON
-          -output_path "${{ github.workspace }}\package" `
-          -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}" # This env var is set by the previous Download CLI step
+          -project_path "${{ github.workspace }}/project.json" ` # FIXED PATH FOR ROOT-LEVEL PROJECT.JSON
+          -output_path "${{ github.workspace }}\package" # Removed -cli_executable_name parameter here
+          # No backtick (`) after -output_path as it's the last argument for the script
 
       - name: Upload UiPath Artifacts
         uses: actions/upload-artifact@v4
@@ -96,35 +96,5 @@ jobs:
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
           Write-Host "Current working directory: $(Get-Location)"
           Write-Host "Listing contents of 'scripts' directory:"
-          Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize # Diagnostic line
-          Write-Host "Attempting to execute DownloadUiPathCli.ps1..."
-          .\scripts\DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}" # Use github.workspace directly
-
-      - name: Publish Nuget Package to DEV
-        shell: pwsh
-        run: |
-          # Temporarily bypass execution policy for the session
-          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-          .\scripts\UiPathDeploy.ps1 `
-          -packages_path "${{ github.workspace }}\package" ` # Package artifact is downloaded here
-          -orchestrator_url "${{ env.ORCH_URL }}" `
-          -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
-          -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
-          -client_id "${{ env.ORCH_CLIENT_ID }}" `
-          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
-          -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}" `
-          -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}" # This env var is set by the Download CLI step in THIS job
-
-  create-pull-request:
-    needs: publish-uipath-nuget-package
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: pull-request
-        uses: repo-sync/pull-request@v2
-        with:
-          destination_branch: "master"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_label: "feature, automated pr"
-          pr_title: "Pull Request From Github Action"
+          Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize # Diagnostic line (can be removed later)
+          Write-Host "Attempting to execute DownloadUiPathCli.
