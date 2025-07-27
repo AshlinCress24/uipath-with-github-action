@@ -32,8 +32,7 @@ jobs:
       run: |
         Write-Host "Attempting to execute DownloadUiPathCli.ps1..."
         
-        # --- ADDED DEBUGGING FOR DOWNLOAD PROCESS ---
-        # Read the content of the DownloadUiPathCli.ps1 script itself on the runner
+        # Read the content of the DownloadUiPathCli.ps1 script itself on the runner for debugging
         Write-Host "--- Content of DownloadUiPathCli.ps1 on Runner ---"
         Get-Content ".\scripts\DownloadUiPathCli.ps1" | ForEach-Object { Write-Host "  $_" }
         Write-Host "--------------------------------------------------"
@@ -41,23 +40,7 @@ jobs:
         # Execute the PowerShell script to download and set up the CLI
         .\scripts\DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
         
-        # After script execution, check the downloaded file size immediately.
-        # Variables set via Add-Content -Path $env:GITHUB_ENV become available in *subsequent* steps.
-        # This block is for demonstrating what would be checked in a subsequent step if needed.
-        # The critical size validation is already handled inside DownloadUiPathCli.ps1.
-        
-        $cli_full_path_after_script = "${{ env.UIPATH_CLI_FULL_PATH }}" # This will likely be empty here as env vars propagate to *next* steps
-        if (-not [string]::IsNullOrEmpty($cli_full_path_after_script) -and (Test-Path $cli_full_path_after_script -PathType Leaf)) {
-            $downloaded_fileInfo = Get-Item $cli_full_path_after_script
-            Write-Host "--- Post-Download Check in Workflow Step (from env variable, might be empty) ---"
-            Write-Host "Downloaded UiPath CLI executable path: $($downloaded_fileInfo.FullName)"
-            Write-Host "Downloaded File Size: $($downloaded_fileInfo.Length) bytes"
-            Write-Host "Downloaded Last Write Time: $($downloaded_fileInfo.LastWriteTime)"
-            Write-Host "----------------------------------------------"
-        } else {
-            Write-Host "Info: UIPATH_CLI_FULL_PATH will be set for subsequent steps. Current step's check relies on DownloadUiPathCli.ps1 internal validation."
-        }
-        # --- END ADDED DEBUGGING ---
+        # Info: UIPATH_CLI_FULL_PATH will be set for subsequent steps. Current step's check relies on DownloadUiPathCli.ps1 internal validation.
 
     - name: Verify UiPath CLI Contents and Version (Build Job)
       shell: pwsh
@@ -107,11 +90,10 @@ jobs:
         & "$cli_full_path" --help
         
         Write-Host "Attempting to get UiPath CLI version..."
-        # Based on the --help output, a global --version/ -v flag is not listed.
-        # Let's try to find version info through common methods.
+        $versionFound = $false
+        
+        # Use a try/finally block to ensure that even if version commands fail, the step doesn't
         try {
-            $versionFound = $false
-            
             # 1. Try running the executable directly to see if it prints version info
             $rawOutput = & "$cli_full_path" 2>&1 | Out-String
             if ($rawOutput -match "version (\d+\.\d+\.\d+)") { # Look for a pattern like "version X.Y.Z"
@@ -140,28 +122,15 @@ jobs:
                     Write-Host "Warning: '$cli_full_path identity --version' failed or is not supported. Error: $($_.Exception.Message)"
                 }
             }
-
+        }
+        finally {
             if (-not $versionFound) {
                 Write-Host "Info: Could not reliably retrieve UiPath CLI version using common methods."
                 Write-Host "Proceeding with verification. Relying on --help success and file size check."
-                # Do NOT exit 1 here if version check is not strictly critical for your pipeline's success.
+                # We do NOT exit 1 here, as the primary goal (CLI existence and basic functionality) has passed.
             }
-
-        } catch {
-            Write-Host "Warning: An unexpected error occurred while attempting to get UiPath CLI version. Error: $($_.Exception.Message)"
-            Write-Host "Proceeding with verification. Relying on --help success and file size check."
-            # Do NOT exit 1 here unless version check is absolutely critical.
         }
         
-        # Example of where you would add further UiPath CLI commands for your CI/CD process:
-        # - name: UiPath Pack
-        #   shell: pwsh
-        #   run: |
-        #     Write-Host "Packing UiPath project..."
-        #     & "${{ env.UIPATH_CLI_FULL_PATH }}" pack --input path/to/your/project.json --output path/for/nuget/package
-        
-        # - name: UiPath Deploy
-        #   shell: pwsh
-        #   run: |
-        #     Write-Host "Deploying UiPath package..."
-        #     & "${{ env.UIPATH_CLI_FULL_PATH }}" deploy --input path/to/your/package.nupkg --orchestrator-url "https://cloud.uipath.com/your-org-name/" --tenant-name "Default" --api-key "${{ secrets.UIPATH_API_KEY }}"
+        # Further UiPath CLI commands would go here, e.g., for packing/deploying
+        # uipath pack ...
+        # uipath deploy ...
