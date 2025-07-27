@@ -39,21 +39,22 @@ $authArgs = @(
     "--organization-name", "$organization_name",
     "--tenant", "$orchestrator_tenant",
     "--client-id", "$client_id",
-    "--client-secret", "$client_secret"
+    "--client-secret", "$client_secret",
+    # --- ADDED THIS LINE ---
+    "--identity-uri", "$orchestrator_url" # Explicitly set identity URI
 )
 
 Write-Host "Auth command string being passed (full path): '$uipathCliExecutable $($authArgs -join ' ')'"
 
-# --- CHANGE HERE: Change directory before executing ---
+# Change directory before executing, as a robust measure
 $originalLocation = Get-Location
 Set-Location $uipathCliDir
 
 # Execute uipath.exe from its directory
 & ".\uipath.exe" $authArgs
 
-# Change back to original location (optional, but good practice)
+# Change back to original location
 Set-Location $originalLocation
-# --- END CHANGE ---
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI authentication failed with exit code $LASTEXITCODE"
@@ -69,8 +70,8 @@ $publishArgs = @(
 
 Write-Host "Publish command string being passed (full path): '$uipathCliExecutable $($publishArgs -join ' ')'"
 
-# --- CHANGE HERE: Change directory before executing for publish too ---
-$originalLocation = Get-Location # Get again in case previous was skipped
+# Change directory before executing, as a robust measure
+$originalLocation = Get-Location
 Set-Location $uipathCliDir
 
 # Execute uipath.exe from its directory
@@ -78,7 +79,6 @@ Set-Location $uipathCliDir
 
 # Change back to original location
 Set-Location $originalLocation
-# --- END CHANGE ---
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI 'orchestrator publish' command failed with exit code $LASTEXITCODE"
