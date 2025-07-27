@@ -88,7 +88,7 @@ jobs:
             }
 
             if (-not $versionFound) {
-                Write-Host "Trying '$cli_full_path identity --version''..."
+                Write-Host "Trying '$cli_full_path identity --version'..." # Corrected missing single quote
                 try {
                     $identityVersionOutput = & "$cli_full_path" identity --version 2>&1 | Out-String -ErrorAction SilentlyContinue
                     if ($identityVersionOutput -match "version (\d+\.\d+\.\d+)") {
@@ -104,4 +104,47 @@ jobs:
             }
         }
         catch {
-            Write-Host "Warning:
+            # THIS IS THE LINE THAT WAS CUT OFF - RESTORING IT
+            Write-Host "Warning: A terminating error occurred while attempting to get UiPath CLI version. Error: $($_.Exception.Message)"
+        }
+        finally {
+            if (-not $versionFound) {
+                Write-Host "Info: Could not reliably retrieve UiPath CLI version using common methods."
+                Write-Host "Proceeding with verification. Relying on --help success and file size check."
+            }
+        }
+        exit 0
+
+
+    - name: Deploy UiPath Package to Orchestrator
+      shell: pwsh
+      env:
+        UIPATH_ORCHESTRATOR_URL: 'https://cloud.uipath.com/your-org-name/' # <--- IMPORTANT: Update
+        UIPATH_TENANT_NAME: 'Default' # <--- IMPORTANT: Update
+        UIPATH_API_KEY: ${{ secrets.UIPATH_API_KEY }} # Retrieve from GitHub Secrets
+      run: |
+        $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
+        
+        # IMPORTANT: Replace with the actual path to your committed .nupkg file.
+        $nupkg_to_deploy = './packages/YourProject.1.0.0.nupkg' # <--- UPDATE THIS PATH
+        
+        if (-not (Test-Path $nupkg_to_deploy -PathType Leaf)) {
+            Write-Error "ERROR: .nupkg file not found at '$nupkg_to_deploy'. Please ensure it's committed to the repo and the path is correct."
+            exit 1
+        }
+        
+        Write-Host "Deploying UiPath package '$nupkg_to_deploy' to Orchestrator..."
+        Write-Host "Orchestrator URL: $env:UIPATH_ORCHESTRATOR_URL"
+        Write-Host "Tenant Name: $env:UIPATH_TENANT_NAME"
+        
+        # Execute the deploy command using 'orchestrator deploy-package'
+        # The API key is sourced from the environment variable (UIPATH_API_KEY)
+        & "$cli_full_path" orchestrator deploy-package `
+          --input "$nupkg_to_deploy" `
+          --orchestrator-url "$env:UIPATH_ORCHESTRATOR_URL" `
+          --tenant-name "$env:UIPATH_TENANT_NAME" `
+          --api-key "$env:UIPATH_API_KEY" `
+          --wait `
+          --wait-timeout 300
+        
+        Write-Host "Deployment command finished."
