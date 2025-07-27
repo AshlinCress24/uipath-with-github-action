@@ -1,5 +1,3 @@
-# scripts/DownloadUiPathCli.ps1
-
 param(
     [string]$WorkspacePath
 )
@@ -48,6 +46,7 @@ try {
     $downloaded_fileInfo = Get-Item $cliFullPath
     $expectedMinSize = 19000000
     $expectedMaxSize = 21000000
+
     if ($downloaded_fileInfo.Length -lt $expectedMinSize -or $downloaded_fileInfo.Length -gt $expectedMaxSize) {
         Write-Error "ERROR: UiPath CLI executable size is unexpected!"
         exit 1
