@@ -63,7 +63,7 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
       
-      - name: Verify Extracted CLI Content and Commands
+      - name: Verify Extracted CLI Content and Commands (Diagnostic)
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
@@ -75,12 +75,10 @@ jobs:
           if (Test-Path $cliExePath) {
               Write-Host "${cliExePath} exists!"
               Write-Host "Running '${cliExePath} --version':"
-              & $cliExePath --version # Test version command
+              & $cliExePath --version
               Write-Host "Running '${cliExePath} --help':"
-              & $cliExePath --help # Get main help output
-              Write-Host "Running '${cliExePath} package --help' (if 'package' command exists):"
-              # Try to get help for the 'package' command, if it exists
-              & $cliExePath package --help || Write-Warning "Command 'package' might not be available or syntax is different."
+              & $cliExePath --help
+              Write-Host "Skipping 'package --help' check as it's not a top-level command for this CLI version."
           } else {
               Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
@@ -124,7 +122,7 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
 
-      - name: Verify Extracted CLI Content and Commands (Publish Job)
+      - name: Verify Extracted CLI Content and Commands (Publish Job - Diagnostic)
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
@@ -139,8 +137,7 @@ jobs:
               & $cliExePath --version
               Write-Host "Running '${cliExePath} --help':"
               & $cliExePath --help
-              Write-Host "Running '${cliExePath} package --help' (if 'package' command exists):"
-              & $cliExePath package --help || Write-Warning "Command 'package' might not be available or syntax is different."
+              Write-Host "Skipping 'package --help' check as it's not a top-level command for this CLI version."
           } else {
               Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
