@@ -19,10 +19,13 @@ jobs:
       - name: Download UiPath CLI and Pack Project
         shell: pwsh
         run: |
-          # Download UiPath CLI and set environment variables in this step
+          # Download UiPath CLI and prepare environment
           pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
-          
-          # Pack the UiPath project
+
+          # Explicitly set environment variable (since $GITHUB_ENV changes do NOT apply within the same step)
+          $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
+
+          # Run the pack script
           pwsh ./scripts/UiPathPack.ps1 `
             -project_path "${{ github.workspace }}/project.json" `
             -output_path "${{ github.workspace }}/output_packages"
@@ -53,11 +56,11 @@ jobs:
           # Download UiPath CLI
           pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
 
-          # Download UiPath package artifact
-          pwsh -Command " \
-            (New-Object System.Net.WebClient).DownloadFile('https://github.com/actions/download-artifact', '${{ github.workspace }}\\downloaded_packages') \
-          "
-          # Instead of the above line, use official download-artifact action (next step) for downloading artifact
+          # Set the environment variable
+          $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
+
+          # Download the package artifact
+          pwsh -Command "Write-Host 'Downloading artifacts...'"
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
