@@ -64,4 +64,37 @@ try {
     
     if ($extractedContentFolders.Count -ne 1) {
         Write-Error "Unexpected content structure in temporary extraction: Expected exactly one subfolder."
-        # Do not use Format-Table in a script directly as it
+        # If debugging is needed, you can use Write-Host for each item.
+        # Do not use Format-Table in a script directly as it can cause parsing issues if not handled carefully.
+        Get-ChildItem -Path $tempExtractDir -Recurse | ForEach-Object { Write-Host $_.FullName }
+        exit 1
+    }
+    $extractedContentPath = $extractedContentFolders[0].FullName
+    
+    Write-Host "Moving contents from '$extractedContentPath' to '$cliDir'..."
+    # Move all items (files and subdirectories) from inside the extracted subfolder to the final $cliDir
+    Move-Item -Path (Join-Path $extractedContentPath "*") -Destination $cliDir -Force -ErrorAction Stop
+    Write-Host "Successfully moved contents to $cliDir."
+
+    # --- Step 5: Clean up temporary files and directories ---
+    Write-Host "Cleaning up temporary files and directories..."
+    # Remove the temporary extraction directory (which should now be empty or contain only the moved files if Move-Item copies)
+    Remove-Item -Path $tempExtractDir -Recurse -Force -ErrorAction SilentlyContinue
+    # Remove the downloaded zip file
+    Remove-Item -Path $zipFilePath -Force -ErrorAction SilentlyContinue
+    Write-Host "Cleanup complete."
+
+    # Add the CLI directory to the PATH for the current job
+    $env:Path += ";$cliDir"
+    Write-Host "Added '$cliDir' to PATH for this session."
+
+    # Make the executable name available to subsequent steps via GITHUB_ENV
+    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=$cliExecutableName"
+    Write-Host "Set UIPATH_CLI_EXECUTABLE_NAME to '$cliExecutableName' in GITHUB_ENV."
+
+} catch {
+    Write-Error ("Failed to download or setup UiPath CLI: " + $_.Exception.Message)
+    exit 1
+}
+
+Write-Host "UiPath CLI Setup completed."
