@@ -18,7 +18,7 @@ if (-not (Test-Path $destination_folder)) {
 Write-Host "Packaging project: $project_json_path"
 Write-Host "Destination folder: $destination_folder"
 
-# EXECUTE THE CORRECTED COMMAND HERE:
+# Execute the uipath.exe studio package pack command
 & $uipathCliExecutable studio package pack --source "$project_json_path" --destination "$destination_folder"
 
 if ($LASTEXITCODE -ne 0) {
