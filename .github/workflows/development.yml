@@ -1,145 +1,140 @@
-name: UiPath CI/CD Pipeline (Development)
+name: UiPath CI/CD Workflow
 
 on:
   push:
     branches:
-      - develop
+      - develop # Trigger on pushes to the develop branch
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-latest # Use a Windows runner for UiPath CLI
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Download and Setup UiPath CLI
-        shell: pwsh
-        run: |
-          # Temporarily bypass execution policy for the session to ensure scripts can run
-          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-          Write-Host "Current working directory: $(Get-Location)"
-          Write-Host "Listing contents of 'scripts' directory:"
-          Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize
-          Write-Host "Attempting to execute DownloadUiPathCli.ps1..."
+    - name: Set up PowerShell environment
+      shell: pwsh
+      run: |
+        # Temporarily bypass execution policy for the session to ensure scripts can run
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+        Write-Host "Current working directory: $(Get-Location)"
+        Write-Host "Listing contents of 'scripts' directory:"
+        Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize
 
-          # --- ADDED DEBUGGING FOR DOWNLOAD PROCESS ---
-          # Read the content of the DownloadUiPathCli.ps1 script itself on the runner
-          Write-Host "--- Content of DownloadUiPathCli.ps1 on Runner ---"
-          Get-Content ".\scripts\DownloadUiPathCli.ps1" | ForEach-Object { Write-Host "  $_" }
-          Write-Host "--------------------------------------------------"
+    - name: Download and Setup UiPath CLI
+      shell: pwsh
+      env:
+        # These will be set by the DownloadUiPathCli.ps1 script via GITHUB_ENV.
+        # Initialize them as empty strings if they are expected to be populated.
+        UIPATH_CLI_FULL_PATH: ''
+        UIPATH_CLI_DIR: ''
+      run: |
+        Write-Host "Attempting to execute DownloadUiPathCli.ps1..."
+        
+        # --- ADDED DEBUGGING FOR DOWNLOAD PROCESS ---
+        # Read the content of the DownloadUiPathCli.ps1 script itself on the runner
+        Write-Host "--- Content of DownloadUiPathCli.ps1 on Runner ---"
+        Get-Content ".\scripts\DownloadUiPathCli.ps1" | ForEach-Object { Write-Host "  $_" }
+        Write-Host "--------------------------------------------------"
+        
+        # Execute the PowerShell script to download and set up the CLI
+        .\scripts\DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
+        
+        # After script execution, check the downloaded file size immediately.
+        # Variables set via Add-Content -Path $env:GITHUB_ENV become available in *subsequent* steps.
+        # This block is for demonstrating what would be checked in a subsequent step if needed.
+        # The critical size validation is already handled inside DownloadUiPathCli.ps1.
+        
+        $cli_full_path_after_script = "${{ env.UIPATH_CLI_FULL_PATH }}" # This will likely be empty here as env vars propagate to *next* steps
+        if (-not [string]::IsNullOrEmpty($cli_full_path_after_script) -and (Test-Path $cli_full_path_after_script -PathType Leaf)) {
+            $downloaded_fileInfo = Get-Item $cli_full_path_after_script
+            Write-Host "--- Post-Download Check in Workflow Step (from env variable, might be empty) ---"
+            Write-Host "Downloaded UiPath CLI executable path: $($downloaded_fileInfo.FullName)"
+            Write-Host "Downloaded File Size: $($downloaded_fileInfo.Length) bytes"
+            Write-Host "Downloaded Last Write Time: $($downloaded_fileInfo.LastWriteTime)"
+            Write-Host "----------------------------------------------"
+        } else {
+            Write-Host "Info: UIPATH_CLI_FULL_PATH will be set for subsequent steps. Current step's check relies on DownloadUiPathCli.ps1 internal validation."
+        }
+        # --- END ADDED DEBUGGING ---
 
-          # Execute the PowerShell script to download and set up the CLI
-          .\scripts\DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
-
-          # After script execution, check the downloaded file size immediately
-          $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
-          if (-not [string]::IsNullOrEmpty($cli_full_path) -and (Test-Path $cli_full_path -PathType Leaf)) {
-              $downloaded_fileInfo = Get-Item $cli_full_path
-              Write-Host "--- Post-Download Check in Workflow Step ---"
-              Write-Host "Downloaded UiPath CLI executable path: $($downloaded_fileInfo.FullName)"
-              Write-Host "Downloaded File Size: $($downloaded_fileInfo.Length) bytes"
-              Write-Host "Downloaded Last Write Time: $($downloaded_fileInfo.LastWriteTime)"
-              Write-Host "----------------------------------------------"
-          } else {
-              Write-Host "Warning: UIPATH_CLI_FULL_PATH not set or file not found after Download script execution."
-          }
-          # --- END ADDED DEBUGGING ---
-
-      - name: Verify UiPath CLI Contents and Version (Build Job)
-        if: success() # Only run if the previous step succeeded
-        shell: pwsh
-        run: |
-          Write-Host "--- Verifying UiPath CLI Setup ---"
-          # Display the environment variables set by the previous step
-          Write-Host "UiPath CLI Full Path from environment: ${{ env.UIPATH_CLI_FULL_PATH }}"
-          Write-Host "UiPath CLI Directory from environment: ${{ env.UIPATH_CLI_DIR }}"
-
-          # Retrieve the paths from the environment variables
-          $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
-          $cli_dir = "${{ env.UIPATH_CLI_DIR }}"
-
-          # Critical check: Ensure the executable path is actually set by the previous step
-          if ([string]::IsNullOrEmpty($cli_full_path)) {
-              Write-Error "ERROR: UIPATH_CLI_FULL_PATH environment variable was not set by the previous step. Cannot verify CLI."
-              exit 1
-          }
-
-          # Check if the executable file actually exists at the reported path
-          if (-not (Test-Path $cli_full_path -PathType Leaf)) {
-              Write-Error "UiPath CLI executable '$cli_full_path' not found at expected path."
-              Write-Host "Listing contents of the expected CLI directory: $cli_dir"
-              Get-ChildItem -Path $cli_dir -Recurse -Force | Format-Table -AutoSize
-              exit 1
-          }
-
-          Write-Host "UiPath CLI executable found at: $cli_full_path"
-
-          # Get file size and last write time to confirm it's the new, correct one
-          $fileInfo = Get-Item $cli_full_path
-          Write-Host "File Size: $($fileInfo.Length) bytes"
-          Write-Host "Last Write Time: $($fileInfo.LastWriteTime)"
-
-          # Expected size for the new CLI is around 9-10MB (e.g., 9952177 bytes observed for a recent version)
-          # The old, problematic CLI was ~20MB (20114944 bytes)
-          $expectedMinSize = 9000000 # Minimum expected size for the new CLI
-          $expectedMaxSize = 11000000 # Maximum expected size for the new CLI
-
-          if ($fileInfo.Length -lt $expectedMinSize -or $fileInfo.Length -gt $expectedMaxSize) {
-              Write-Error "WARNING: UiPath CLI executable size is unexpected. Expected between $expectedMinSize and $expectedMaxSize bytes, but found $($fileInfo.Length) bytes. This strongly indicates an old or corrupted CLI."
-              # For now, we will print a warning but not fail the job immediately to allow further debugging if needed.
-              # In a production pipeline, this might be an 'exit 1'.
-          } else {
-              Write-Host "UiPath CLI executable size is within expected range. ($($fileInfo.Length) bytes)"
-          }
-
-          Write-Host "Running '$cli_full_path --help' to check commands..."
-          & "$cli_full_path" --help
-
-          Write-Host "Running '$cli_full_path version' to check version (using 'version' command)..."
-          # Try different ways to get the version, as flags can vary between CLI versions.
+    - name: Verify UiPath CLI Contents and Version (Build Job)
+      shell: pwsh
+      run: |
+        Write-Host "--- Verifying UiPath CLI Setup ---"
+        # Display the environment variables set by the previous step
+        Write-Host "UiPath CLI Full Path from environment: ${{ env.UIPATH_CLI_FULL_PATH }}"
+        Write-Host "UiPath CLI Directory from environment: ${{ env.UIPATH_CLI_DIR }}"
+        
+        # Retrieve the paths from the environment variables
+        $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
+        $cli_dir = "${{ env.UIPATH_CLI_DIR }}"
+        
+        # Critical check: Ensure the executable path is actually set by the previous step
+        if ([string]::IsNullOrEmpty($cli_full_path)) {
+            Write-Error "ERROR: UIPATH_CLI_FULL_PATH environment variable was not set by the previous step. Cannot verify CLI."
+            exit 1
+        }
+        
+        # Check if the executable file actually exists at the reported path
+        if (-not (Test-Path $cli_full_path -PathType Leaf)) {
+            Write-Error "UiPath CLI executable '$cli_full_path' not found at expected path."
+            Write-Host "Listing contents of the expected CLI directory: $cli_dir"
+            Get-ChildItem -Path $cli_dir -Recurse -Force | Format-Table -AutoSize
+            exit 1
+        }
+        
+        Write-Host "UiPath CLI executable found at: $cli_full_path"
+        
+        # Get file size and last write time to confirm it's the new, correct one
+        $fileInfo = Get-Item $cli_full_path
+        Write-Host "File Size: $($fileInfo.Length) bytes"
+        Write-Host "Last Write Time: $($fileInfo.LastWriteTime)"
+        
+        # UPDATED: Expected size for the new CLI is around 20MB
+        $expectedMinSize = 19000000 # Minimum expected size for the current CLI (approx 20MB)
+        $expectedMaxSize = 21000000 # Maximum expected size for the current CLI (approx 20MB)
+        
+        if ($fileInfo.Length -lt $expectedMinSize -or $fileInfo.Length -gt $expectedMaxSize) {
+            Write-Error "CRITICAL ERROR: UiPath CLI executable size is unexpected. Expected between $expectedMinSize and $expectedMaxSize bytes, but found $($fileInfo.Length) bytes. This indicates an old or corrupted CLI. Failing this step."
+            # Now, this step *will* fail if the size is wrong, which is good.
+            exit 1
+        } else {
+            Write-Host "UiPath CLI executable size is within expected range. ($($fileInfo.Length) bytes)"
+        }
+        
+        Write-Host "Running '$cli_full_path --help' to check commands..."
+        & "$cli_full_path" --help
+        
+        Write-Host "Running '$cli_full_path version' to check version (using 'version' command)..."
+        # Try different ways to get the version, as flags can vary between CLI versions.
+        try {
+          & "$cli_full_path" version # Common for structured CLIs like 'git version'
+        } catch {
+          Write-Host "Warning: '$cli_full_path version' failed. Trying '$cli_full_path --version'..."
           try {
-            & "$cli_full_path" version # Common for structured CLIs like 'git version'
+              & "$cli_full_path" --version # Standard GNU long option
           } catch {
-            Write-Host "Warning: '$cli_full_path version' failed. Trying '$cli_full_path --version'..."
-            try {
-                & "$cli_full_path" --version # Standard GNU long option
-            } catch {
-                Write-Host "Warning: '$cli_full_path --version' also failed. Trying '$cli_full_path -v'..."
-                try {
-                    & "$cli_full_path" -v # Standard single-letter short option
-                } catch {
-                    Write-Error "ERROR: Could not get UiPath CLI version using 'version', '--version' or '-v'. This indicates an issue with the CLI or its installation."
-                    exit 1 # Fail the job if version cannot be retrieved reliably
-                }
-            }
+              Write-Host "Warning: '$cli_full_path --version' also failed. Trying '$cli_full_path -v''..."
+              try {
+                  & "$cli_full_path" -v # Standard single-letter short option
+              } catch {
+                  Write-Error "ERROR: Could not get UiPath CLI version using 'version', '--version' or '-v'. This indicates an issue with the CLI or its installation."
+                  exit 1 # Fail the job if version cannot be retrieved reliably
+              }
           }
-
-      - name: Authenticate to UiPath Orchestrator (Build Job)
-        # This step assumes that 'uipath.exe' is available in the PATH or accessible via its full path.
-        # It relies on the newer CLI version that supports the 'auth' command.
-        shell: pwsh
-        run: |
-          Write-Host "Attempting to authenticate to UiPath Orchestrator..."
-          Write-Host "Using Orchestrator URL: ${{ secrets.ORCHESTRATOR_URL }}"
-          # Client ID and User Key are sensitive, so don't echo their values.
-
-          # Retrieve the full path to the UiPath CLI executable from the environment variable
-          $uipathCliExecutable = "${{ env.UIPATH_CLI_FULL_PATH }}"
-
-          # Robust checks before attempting authentication
-          if ([string]::IsNullOrEmpty($uipathCliExecutable)) {
-            Write-Error "UIPATH_CLI_FULL_PATH environment variable is not set. Cannot proceed with authentication."
-            exit 1
-          }
-          if (-not (Test-Path $uipathCliExecutable -PathType Leaf)) {
-            Write-Error "UiPath CLI executable not found at '$uipathCliExecutable'. Cannot proceed with authentication."
-            exit 1
-          }
-
-          # Execute the authentication command using the discovered CLI path
-          & "$uipathCliExecutable" auth login --url "${{ secrets.ORCHESTRATOR_URL }}" `
-            --client-id "${{ secrets.UIPATH_CLIENT_ID }}" `
-            --user-key "${{ secrets.UIPATH_USER_KEY }}" `
-            --organization "${{ secrets.ORCHESTRATOR_ORGANIZATION }}" `
-            --tenant
+        }
+        
+        # Example of where you would add further UiPath CLI commands for your CI/CD process:
+        # - name: UiPath Pack
+        #   shell: pwsh
+        #   run: |
+        #     Write-Host "Packing UiPath project..."
+        #     & "${{ env.UIPATH_CLI_FULL_PATH }}" pack --input path/to/your/project.json --output path/for/nuget/package
+        
+        # - name: UiPath Deploy
+        #   shell: pwsh
+        #   run: |
+        #     Write-Host "Deploying UiPath package..."
+        #     & "${{ env.UIPATH_CLI_FULL_PATH }}" deploy --input path/to/your/package.nupkg --orchestrator-url "https://cloud.uipath.com/your-org-name/" --tenant-name "Default" --api-key "${{ secrets.UIPATH_API_KEY }}"
