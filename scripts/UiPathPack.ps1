@@ -1,50 +1,57 @@
+# scripts/UiPathPack.ps1
+
 param(
-    [Parameter(Mandatory=$true)]
     [string]$project_path,
-
-    [Parameter(Mandatory=$true)]
     [string]$output_path,
-
-    [Parameter(Mandatory=$true)]
-    [string]$cli_executable_name # This will now always be "uipath.cli.exe"
+    [string]$cli_executable_name # This should now be "uipath.exe"
 )
 
 Write-Host "Starting UiPath Pack Script (using $cli_executable_name)..."
 
-# The CLI executable should be in PATH
-$uipathCliExecutable = $cli_executable_name
-
-Write-Host "UiPath CLI Executable: $uipathCliExecutable"
-
-# Verify CLI existence in PATH
-try {
-    Get-Command $uipathCliExecutable -ErrorAction Stop | Out-Null
-    Write-Host "$uipathCliExecutable found in PATH."
-} catch {
-    Write-Error "$uipathCliExecutable not found in PATH. Make sure the setup process successfully installed it and added it to PATH."
+$cli_path = Get-Command $cli_executable_name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+if (-not $cli_path) {
+    Write-Error "UiPath CLI executable '$cli_executable_name' not found in PATH."
     exit 1
 }
+Write-Host "UiPath CLI Executable: $cli_path"
+Write-Host "$cli_executable_name found in PATH."
 
-# Ensure output directory exists
+
+# Ensure the output directory exists
 Write-Host "Ensuring output directory exists: $output_path"
-if (-not (Test-Path $output_path)) {
+if (-not (Test-Path $output_path -PathType Container)) {
     New-Item -ItemType Directory -Path $output_path -Force | Out-Null
 }
 
 Write-Host "Packing UiPath project: $project_path"
 Write-Host "Output path: $output_path"
 
-# Execute CLI to pack the project (using v2.x CLI syntax)
-Write-Host "Using uipath.cli.exe (v2) syntax for 'project pack'..."
-$packResult = & $uipathCliExecutable project pack `
-    --file "$project_path" `
-    --output "$output_path"
+# --- IMPORTANT CHANGE FOR UiPath CLI v2.0.44 ---
+# The command for packing is now 'uipath archive pack' or 'uipath app pack' depending on context.
+# For generic project packing, 'archive pack' is common.
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'project pack' command failed with exit code $LASTEXITCODE."
-    exit $LASTEXITCODE
-} else {
-    Write-Host "UiPath project packed successfully using $uipathCliExecutable."
+Write-Host "Using UiPath CLI v2 syntax for 'archive pack'..."
+try {
+    # Execute the UiPath CLI command for packing
+    # Check 'uipath.exe archive pack --help' for all options.
+    # Common options: -p (project path), -o (output path), --library (if it's a library)
+    & $cli_executable_name archive pack `
+        --project-path "$project_path" `
+        --output "$output_path" `
+        # Add --version for StudioX/Studio based projects if needed, e.g., --version "23.10"
+        # If it's a library project, you might need '--library' argument
+        # Example for a specific version: --version 23.10.8-preview (or other if required)
+        # For simplicity, let's start with just project and output path.
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "UiPath CLI 'archive pack' command failed with exit code $LASTEXITCODE."
+        exit 1
+    }
+    Write-Host "Successfully packed UiPath project."
+
+} catch {
+    Write-Error ("Error packing UiPath project: " + $_.Exception.Message)
+    exit 1
 }
 
-Write-Host "Finished UiPath Pack Script."
+Write-Host "UiPath Pack Script completed."
