@@ -98,7 +98,6 @@ jobs:
         
         if ($fileInfo.Length -lt $expectedMinSize -or $fileInfo.Length -gt $expectedMaxSize) {
             Write-Error "CRITICAL ERROR: UiPath CLI executable size is unexpected. Expected between $expectedMinSize and $expectedMaxSize bytes, but found $($fileInfo.Length) bytes. This indicates an old or corrupted CLI. Failing this step."
-            # Now, this step *will* fail if the size is wrong, which is good.
             exit 1
         } else {
             Write-Host "UiPath CLI executable size is within expected range. ($($fileInfo.Length) bytes)"
@@ -107,23 +106,51 @@ jobs:
         Write-Host "Running '$cli_full_path --help' to check commands..."
         & "$cli_full_path" --help
         
-        Write-Host "Running '$cli_full_path version' to check version (using 'version' command)..."
-        # Try different ways to get the version, as flags can vary between CLI versions.
+        Write-Host "Attempting to get UiPath CLI version..."
+        # Based on the --help output, a global --version/ -v flag is not listed.
+        # Let's try to find version info through common methods.
         try {
-          & "$cli_full_path" version # Common for structured CLIs like 'git version'
+            $versionFound = $false
+            
+            # 1. Try running the executable directly to see if it prints version info
+            $rawOutput = & "$cli_full_path" 2>&1 | Out-String
+            if ($rawOutput -match "version (\d+\.\d+\.\d+)") { # Look for a pattern like "version X.Y.Z"
+                Write-Host "UiPath CLI Version (from raw output): $($Matches[1])"
+                $versionFound = $true
+            } elseif ($rawOutput -match "UiPath Command-Line Interface (\d+\.\d+\.\d+)") { # Another common pattern
+                 Write-Host "UiPath CLI Version (from raw output): $($Matches[1])"
+                 $versionFound = $true
+            } else {
+                Write-Host "Info: Raw '$cli_full_path' output did not contain clear version info."
+            }
+
+            # 2. If not found, try a common subcommand with a version flag, e.g., 'identity'
+            if (-not $versionFound) {
+                Write-Host "Trying '$cli_full_path identity --version'..."
+                try {
+                    $identityVersionOutput = & "$cli_full_path" identity --version 2>&1 | Out-String
+                    if ($identityVersionOutput -match "version (\d+\.\d+\.\d+)") {
+                        Write-Host "UiPath CLI Version (from 'identity --version'): $($Matches[1])"
+                        $versionFound = $true
+                    } else {
+                        Write-Host "Info: '$cli_full_path identity --version' did not produce a clear version string."
+                        Write-Host "Output: $identityVersionOutput"
+                    }
+                } catch {
+                    Write-Host "Warning: '$cli_full_path identity --version' failed or is not supported. Error: $($_.Exception.Message)"
+                }
+            }
+
+            if (-not $versionFound) {
+                Write-Host "Info: Could not reliably retrieve UiPath CLI version using common methods."
+                Write-Host "Proceeding with verification. Relying on --help success and file size check."
+                # Do NOT exit 1 here if version check is not strictly critical for your pipeline's success.
+            }
+
         } catch {
-          Write-Host "Warning: '$cli_full_path version' failed. Trying '$cli_full_path --version'..."
-          try {
-              & "$cli_full_path" --version # Standard GNU long option
-          } catch {
-              Write-Host "Warning: '$cli_full_path --version' also failed. Trying '$cli_full_path -v''..."
-              try {
-                  & "$cli_full_path" -v # Standard single-letter short option
-              } catch {
-                  Write-Error "ERROR: Could not get UiPath CLI version using 'version', '--version' or '-v'. This indicates an issue with the CLI or its installation."
-                  exit 1 # Fail the job if version cannot be retrieved reliably
-              }
-          }
+            Write-Host "Warning: An unexpected error occurred while attempting to get UiPath CLI version. Error: $($_.Exception.Message)"
+            Write-Host "Proceeding with verification. Relying on --help success and file size check."
+            # Do NOT exit 1 here unless version check is absolutely critical.
         }
         
         # Example of where you would add further UiPath CLI commands for your CI/CD process:
