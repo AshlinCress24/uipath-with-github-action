@@ -1,29 +1,31 @@
 param(
     [Parameter(Mandatory=$true)]
-    [string]$project_json_path,
+    [string]$project_path,
     [Parameter(Mandatory=$true)]
-    [string]$destination_folder
+    [string]$output_path
 )
 
-Write-Host "Starting UiPath Package Build..."
+Write-Host "Starting UiPath Package Creation..."
 
-# Define the full path to uipath.exe
-$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipath.exe"
+# Define the full path to uipcli.exe (note: no 'h' in uipcli for older versions)
+$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipcli.exe"
 
-# Ensure the destination folder exists
-if (-not (Test-Path $destination_folder)) {
-    New-Item -ItemType Directory -Force -Path $destination_folder
+# Ensure the output directory exists
+if (-not (Test-Path $output_path)) {
+    Write-Host "Creating output directory: $output_path"
+    New-Item -ItemType Directory -Path $output_path -Force | Out-Null
 }
 
-Write-Host "Packaging project: $project_json_path"
-Write-Host "Destination folder: $destination_folder"
+Write-Host "Packing UiPath project: $project_path"
 
-# Execute the uipath.exe studio package pack command
-& $uipathCliExecutable studio package pack --source "$project_json_path" --destination "$destination_folder"
+# Use the older 'package pack' command syntax
+& $uipathCliExecutable package pack `
+    --project-path "$project_path" `
+    --output "$output_path"
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'studio package pack' command failed with exit code $LASTEXITCODE"
+    Write-Error "UiPath CLI 'package pack' command failed with exit code $LASTEXITCODE"
     exit 1
 }
 
-Write-Host "UiPath Package Build Completed."
+Write-Host "UiPath Package Creation Completed."
