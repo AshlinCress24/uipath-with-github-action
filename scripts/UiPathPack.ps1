@@ -8,8 +8,8 @@ param(
 
 Write-Host "Starting UiPath Pack Script..."
 
-# UPDATED PATH: The UiPath CLI executable path from the UiPath.Automation.Cloud.Activities package
-$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.Automation.Cloud.Activities.1.21.0\tools\uipcli.exe"
+# UPDATED PATH: The UiPath CLI executable path from the UiPath.Automation.Cloud.Activities package when installed with -ExcludeVersion
+$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.Automation.Cloud.Activities\tools\uipcli.exe"
 
 Write-Host "UiPath CLI Executable Path: $uipathCliExecutable"
 
