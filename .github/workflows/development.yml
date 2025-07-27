@@ -16,18 +16,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup UiPath CLI
-        uses: Mikael-RnD/setup-uipath@v2
-        # no version specified to avoid feed API version issues
+      # Manual fallback: download and extract UiPath CLI directly from official GitHub releases
+      - name: Download and Extract UiPath CLI Manually (Fallback)
+        shell: pwsh
+        run: |
+          $cliZip = "uipathcli.zip"
+          $cliUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+          Invoke-WebRequest $cliUrl -OutFile $cliZip
+          Expand-Archive -Force -Path $cliZip -DestinationPath "./uipathcli"
+          Remove-Item $cliZip
+          echo "##vso[task.prependpath]$(Resolve-Path ./uipathcli)"
+          Write-Host "Added extracted UiPath CLI folder to PATH."
 
+      # Verify that uipathcli command is available in PATH
       - name: Check UiPath CLI availability
         shell: pwsh
         run: |
-          Write-Host "PATH environment variable:"
-          Write-Host $env:PATH
-          
+          Write-Host "PATH: $env:PATH"
           $cliCmd = Get-Command "uipathcli" -ErrorAction SilentlyContinue
-          
           if (-not $cliCmd) {
             Write-Error "ERROR: 'uipathcli' command not found in PATH."
             exit 1
@@ -35,6 +41,7 @@ jobs:
             Write-Host "'uipathcli' found at: $($cliCmd.Path)"
           }
 
+      # Run pack script
       - name: Pack UiPath Project
         shell: pwsh
         run: pwsh ./scripts/UiPathPack.ps1 `
@@ -55,8 +62,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup UiPath CLI
-        uses: Mikael-RnD/setup-uipath@v2
+      # Repeat manual download fallback in deploy job as well (if needed)
+      - name: Download and Extract UiPath CLI Manually (Fallback)
+        shell: pwsh
+        run: |
+          $cliZip = "uipathcli.zip"
+          $cliUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+          Invoke-WebRequest $cliUrl -OutFile $cliZip
+          Expand-Archive -Force -Path $cliZip -DestinationPath "./uipathcli"
+          Remove-Item $cliZip
+          echo "##vso[task.prependpath]$(Resolve-Path ./uipathcli)"
+          Write-Host "Added extracted UiPath CLI folder to PATH."
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
