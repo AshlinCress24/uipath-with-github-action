@@ -134,4 +134,59 @@ jobs:
           -output_path "${{ github.workspace }}\package"
 
       - name: Upload UiPath Artifacts
-        uses: actions/upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Artifacts
+          path: |
+            package/*.*
+            scripts/*.ps1
+
+  publish-uipath-nuget-package:
+    needs: build-uipath-nuget-package
+    runs-on: windows-latest
+    steps:
+      - name: Download UiPath Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Artifacts
+      
+      - name: Setup NuGet.exe (for Publish Job)
+        shell: pwsh
+        run: |
+          $nugetExePath = "$env:GITHUB_WORKSPACE\nuget.exe"
+          Write-Host "Downloading nuget.exe to $nugetExePath"
+          Invoke-WebRequest -Uri https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile $nugetExePath -UseBasicParsing
+          if (-not (Test-Path $nugetExePath)) {
+              Write-Error "Failed to download nuget.exe. Exiting."
+              exit 1
+          }
+          Write-Host "nuget.exe downloaded successfully."
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:GITHUB_WORKSPACE"
+
+      - name: Install UiPath CLI (for Publish Job via Activities Package and nuget.exe)
+        shell: pwsh
+        run: |
+          $cliInstallDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          $activitiesPackageId = "UiPath.Automation.Cloud.Activities" 
+          $activitiesPackageVersion = "1.21.0" 
+          $nugetFeed = "https://api.nuget.org/v3/index.json"
+
+          Write-Host "Creating CLI installation directory: $cliInstallDir"
+          New-Item -ItemType Directory -Path $cliInstallDir -Force | Out-Null
+
+          Write-Host "Installing package '$activitiesPackageId' v$activitiesPackageVersion into $cliInstallDir using nuget.exe from $nugetFeed"
+          nuget install $activitiesPackageId -Version $activitiesPackageVersion -OutputDirectory $cliInstallDir -Source $nugetFeed -NoCache -ExcludeVersion
+
+          $extractedPackageRoot = Join-Path $cliInstallDir $activitiesPackageId 
+          $cliExePath = Join-Path $extractedPackageRoot "tools\uipcli.exe" 
+          
+          $extractedCliToolsDir = Join-Path $extractedPackageRoot "tools"
+          
+          Write-Host "Adding UiPath CLI tools directory to PATH: $extractedCliToolsDir"
+          Add-Content -Path $env:GITHUB_PATH -Value $extractedCliToolsDir
+
+      - name: Verify Extracted CLI Content and Commands (Publish Job - Diagnostic)
+        shell: pwsh
+        run: |
+          $cliInstallDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          $activitiesPackageId =
