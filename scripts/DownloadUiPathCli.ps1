@@ -10,9 +10,9 @@ $cliDirName = "uipathcli_" + (Get-Random -Maximum 99999)
 $cliDir = Join-Path $WorkspacePath $cliDirName
 
 # Define the UiPath CLI download URL from GitHub releases.
-# IMPORTANT: Instead of 'latest', we're now specifying a concrete version.
-# You might need to update this URL periodically to get the newest CLI.
-$cliVersion = "24.5.8973.29827" # Example: Check https://github.com/UiPath/uipathcli/releases for the latest stable version
+# IMPORTANT: Updated to the currently available specific version.
+# You might need to update this URL periodically to get the newest CLI if you don't use 'latest'.
+$cliVersion = "24.5.8973.30827" # THIS HAS BEEN UPDATED
 $cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/download/v$cliVersion/uipathcli-windows-amd64.zip"
 
 $zipFileName = "uipath.cli.zip"
@@ -92,14 +92,4 @@ try {
     }
 
     # --- Step 5: Clean up the downloaded zip file ---
-    Write-Host "Cleaning up downloaded zip file..."
-    Remove-Item -Path $zipFilePath -Force -ErrorAction SilentlyContinue
-    Write-Host "Cleanup complete."
-
-} catch {
-    # Catch any errors during the process and exit with a non-zero code to fail the step.
-    Write-Error ("FATAL ERROR: Failed to download or setup UiPath CLI: " + $_.Exception.Message)
-    exit 1
-}
-
-Write-Host "UiPath CLI Setup completed successfully."
+    Write-Host "Cleaning up downloaded zip
