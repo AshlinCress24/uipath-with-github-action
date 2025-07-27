@@ -15,11 +15,11 @@ param(
     [string]$folder_organization_unit
 )
 
-Write-Host "Starting UiPath Package Deployment..."
+Write-Host "Starting UiPath Package Deployment (using older CLI version)..."
 
-# Define the full path to uipath.exe directory
+# Define the full path to uipcli.exe (note: no 'h' in uipcli for older versions)
 $uipathCliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-$uipathCliExecutable = Join-Path $uipathCliDir "uipath.exe"
+$uipathCliExecutable = Join-Path $uipathCliDir "uipcli.exe"
 
 # Get the latest .nupkg file in the packages_path
 $nupkgFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -32,57 +32,35 @@ if (-not $nupkgFile) {
 $nupkgFullPath = $nupkgFile.FullName
 Write-Host "Found package: $nupkgFullPath"
 
-# --- NEW AUTHENTICATION STRATEGY: Create .uipath/config file ---
-Write-Host "Attempting authentication by creating UiPath CLI config file..."
+Write-Host "Authenticating to Orchestrator using 'orchestrator login'..."
+# For older CLI versions, 'orchestrator login' with client-credentials is common
+# This might also implicitly handle the identity server URL.
+# Ensure the URL is just the base cloud URL, not tenant-specific.
+$loginArgs = @(
+    "orchestrator", "login",
+    "--url", "$orchestrator_url",
+    "--organization-name", "$organization_name",
+    "--tenant", "$orchestrator_tenant",
+    "--client-id", "$client_id",
+    "--client-secret", "$client_secret"
+)
 
-# Determine the correct home directory for the .uipath folder
-# On Windows, $env:USERPROFILE is more reliable than $env:HOME
-$uipathConfigDir = Join-Path $env:USERPROFILE ".uipath"
+Write-Host "Login command string being passed: '$uipathCliExecutable $($loginArgs -join ' ')'"
 
-# Add a diagnostic check for the path
-Write-Host "Resolved UiPath config directory path: $uipathConfigDir"
+$originalLocation = Get-Location
+Set-Location $uipathCliDir
 
-if (-not (Test-Path $uipathConfigDir)) {
-    Write-Host "Creating .uipath configuration directory: $uipathConfigDir"
-    New-Item -ItemType Directory -Path $uipathConfigDir | Out-Null
-} else {
-    Write-Host "UiPath configuration directory already exists: $uipathConfigDir"
-}
+& ".\uipathcli.exe" $loginArgs # Use uipcli.exe
 
-# Construct the content for the config file.
-# Using a here-string for multi-line content.
-$configFileContent = @"
-profiles:
-  - name: default
-    organization: "$organization_name"
-    tenant: "$orchestrator_tenant"
-    auth:
-      clientId: "$client_id"
-      clientSecret: "$client_secret"
-"@
+Set-Location $originalLocation
 
-$configFilePath = Join-Path $uipathConfigDir "config"
-
-# Write the config file
-Write-Host "Writing UiPath CLI config file to: $configFilePath"
-Set-Content -Path $configFilePath -Value $configFileContent -Force
-
-# Verify config file creation (optional, but good for debugging)
-if (Test-Path $configFilePath) {
-    Write-Host "UiPath CLI config file created successfully."
-    # For debugging, you can uncomment the next lines to see the content.
-    # Be cautious with secrets in logs!
-    # Write-Host "Config file content:"
-    # Get-Content $configFilePath | Write-Host
-} else {
-    Write-Error "Failed to create UiPath CLI config file."
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "UiPath CLI 'orchestrator login' command failed with exit code $LASTEXITCODE"
     exit 1
 }
 
-Write-Host "Proceeding with Orchestrator operations using configured credentials."
-# --- END NEW AUTHENTICATION STRATEGY ---
-
 Write-Host "Publishing package to Orchestrator folder: $folder_organization_unit"
+# The publish command syntax should be similar, just ensuring uipcli.exe is used
 $publishArgs = @(
     "orchestrator", "publish",
     "--file", "$nupkgFullPath",
@@ -91,14 +69,11 @@ $publishArgs = @(
 
 Write-Host "Publish command string being passed: '$uipathCliExecutable $($publishArgs -join ' ')'"
 
-# Temporarily change directory to where uipath.exe is located for execution robustness
-$originalLocation = Get-Location
+$originalLocation = Get-Location # Get again in case previous was skipped
 Set-Location $uipathCliDir
 
-# Execute uipath.exe from its directory
-& ".\uipath.exe" $publishArgs
+& ".\uipathcli.exe" $publishArgs # Use uipcli.exe
 
-# Change back to original location
 Set-Location $originalLocation
 
 if ($LASTEXITCODE -ne 0) {
