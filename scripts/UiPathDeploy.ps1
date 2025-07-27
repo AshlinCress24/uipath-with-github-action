@@ -17,8 +17,8 @@ param(
 
 Write-Host "Starting UiPath Package Deployment..."
 
-# Define the full path to uipath.exe (CORRECTED NAME)
-$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipath.exe" # <-- CHANGED TO uipath.exe
+# Define the full path to uipath.exe
+$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipath.exe"
 
 # Get the latest .nupkg file in the packages_path
 $nupkgFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -33,7 +33,9 @@ Write-Host "Found package: $nupkgFullPath"
 
 Write-Host "Authenticating to Orchestrator..."
 # Execute the uipath.exe auth command using the full path
-& $uipathCliExecutable auth client-credentials `
+# Note: Based on the --help output, 'auth' is a top-level command under 'identity',
+# so it should be 'identity auth client-credentials'. Let's correct this here.
+& $uipathCliExecutable identity auth client-credentials `
     --url "$orchestrator_url" `
     --organization-name "$organization_name" `
     --tenant "$orchestrator_tenant" `
