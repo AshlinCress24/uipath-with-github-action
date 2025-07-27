@@ -6,176 +6,71 @@ on:
       - develop # Trigger on pushes to the develop branch
 
 jobs:
-  build:
-    runs-on: windows-latest # Use a Windows runner for UiPath CLI
+  build_and_deploy: # Renamed job as it now includes deploy
+    runs-on: windows-latest # Use a Windows runner for UiPath actions
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Set up PowerShell environment
-      shell: pwsh
-      run: |
-        # Temporarily bypass execution policy for the session to ensure scripts can run
-        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-        Write-Host "Current working directory: $(Get-Location)"
-        Write-Host "Listing contents of 'scripts' directory:"
-        Get-ChildItem -Path ".\scripts" -Recurse -Force | Format-Table -AutoSize
+    # The previous custom PowerShell steps for downloading and verifying
+    # the generic 'uipath.exe' CLI are no longer needed for packing/deploying
+    # as the dedicated UiPath actions handle their own dependencies.
 
-    - name: Download and Setup UiPath CLI
-      shell: pwsh
-      env:
-        UIPATH_CLI_FULL_PATH: ''
-        UIPATH_CLI_DIR: ''
-      run: |
-        Write-Host "Attempting to execute DownloadUiPathCli.ps1..."
-        Get-Content ".\scripts\DownloadUiPathCli.ps1" | ForEach-Object { Write-Host "  $_" }
-        Write-Host "--------------------------------------------------"
-        .\scripts\DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
-
-    - name: Verify UiPath CLI Contents and Version (Build Job)
-      shell: pwsh
-      run: |
-        Write-Host "--- Verifying UiPath CLI Setup ---"
-        $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
-        $cli_dir = "${{ env.UIPATH_CLI_DIR }}"
-        
-        if ([string]::IsNullOrEmpty($cli_full_path)) {
-            Write-Error "ERROR: UIPATH_CLI_FULL_PATH environment variable was not set. Cannot verify CLI."
-            exit 1
-        }
-        if (-not (Test-Path $cli_full_path -PathType Leaf)) {
-            Write-Error "UiPath CLI executable '$cli_full_path' not found."
-            Get-ChildItem -Path $cli_dir -Recurse -Force | Format-Table -AutoSize
-            exit 1
-        }
-        
-        Write-Host "UiPath CLI executable found at: $cli_full_path"
-        $fileInfo = Get-Item $cli_full_path
-        Write-Host "File Size: $($fileInfo.Length) bytes"
-        Write-Host "Last Write Time: $($fileInfo.LastWriteTime)"
-        
-        $expectedMinSize = 19000000 
-        $expectedMaxSize = 21000000 
-        
-        if ($fileInfo.Length -lt $expectedMinSize -or $fileInfo.Length -gt $expectedMaxSize) {
-            Write-Error "CRITICAL ERROR: UiPath CLI executable size is unexpected. Failing this step."
-            exit 1
-        } else {
-            Write-Host "UiPath CLI executable size is within expected range. ($($fileInfo.Length) bytes)"
-        }
-        
-        Write-Host "Running '$cli_full_path --help' to check commands..."
-        & "$cli_full_path" --help
-        
-        Write-Host "Attempting to get UiPath CLI version..."
-        $versionFound = $false
-        try {
-            $rawOutput = & "$cli_full_path" 2>&1 | Out-String -ErrorAction SilentlyContinue
-            if ($rawOutput -match "version (\d+\.\d+\.\d+)") { 
-                Write-Host "UiPath CLI Version (from raw output): $($Matches[1])"
-                $versionFound = $true
-            } elseif ($rawOutput -match "UiPath Command-Line Interface (\d+\.\d+\.\d+)") { 
-                 Write-Host "UiPath CLI Version (from raw output): $($Matches[1])"
-                 $versionFound = $true
-            } else {
-                Write-Host "Info: Raw '$cli_full_path' output did not contain clear version info."
-            }
-
-            if (-not $versionFound) {
-                Write-Host "Trying '$cli_full_path identity --version'..."
-                try {
-                    $identityVersionOutput = & "$cli_full_path" identity --version 2>&1 | Out-String -ErrorAction SilentlyContinue
-                    if ($identityVersionOutput -match "version (\d+\.\d+\.\d+)") {
-                        Write-Host "UiPath CLI Version (from 'identity --version'): $($Matches[1])"
-                        $versionFound = $true
-                    } else {
-                        Write-Host "Info: '$cli_full_path identity --version' did not produce a clear version string."
-                        Write-Host "Output: $identityVersionOutput"
-                    }
-                } catch {
-                    Write-Host "Warning: '$cli_full_path identity --version' failed or is not supported. Error: $($_.Exception.Message)"
-                }
-            }
-        }
-        catch {
-            Write-Host "Warning: A terminating error occurred while attempting to get UiPath CLI version. Error: $($_.Exception.Message)"
-        }
-        finally {
-            if (-not $versionFound) {
-                Write-Host "Info: Could not reliably retrieve UiPath CLI version using common methods."
-                Write-Host "Proceeding with verification. Relying on --help success and file size check."
-            }
-        }
-        exit 0 # Explicitly exit with 0 to ensure the step passes if all critical checks were successful.
-
-
-    # --- NEW: UiPath Pack Step ---
+    # --- Step 1: Pack UiPath Project using UiPath Action ---
     - name: Pack UiPath Project
-      shell: pwsh
-      id: pack_project # Give this step an ID to reference its outputs
-      run: |
-        $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
-        $project_json_path = "./YourProjectFolder/project.json" # <--- IMPORTANT: Update with your actual project.json path
-        $output_dir = "./output"
+      id: pack_project # Assign an ID to this step to reference its outputs later
+      uses: uipath-actions/studio-pack-project@v1
+      with:
+        # IMPORTANT: Replace './YourProjectFolder/' with the actual path to your
+        # UiPath project folder relative to the root of your GitHub repository.
+        # This folder MUST contain your 'project.json' file.
+        project-path: './YourProjectFolder/' 
         
-        # Create output directory if it doesn't exist
-        if (-not (Test-Path $output_dir)) {
-            New-Item -ItemType Directory -Path $output_dir
-            Write-Host "Created output directory: $output_dir"
-        }
+        # Define the folder where the generated .nupkg file will be saved.
+        # This path is relative to the GitHub Actions workspace.
+        output-folder: './output/' 
         
-        Write-Host "Packing UiPath project from '$project_json_path'..."
-        # Execute the pack command
-        # Capture the output to find the .nupkg file name
-        $pack_output = & "$cli_full_path" pack --input "$project_json_path" --output "$output_dir" 2>&1 | Out-String
-        Write-Host $pack_output
-        
-        # Try to extract the generated package path from the output
-        $nupkg_file = $pack_output | Select-String -Pattern "Successfully created package '(.*\.nupkg)'" | ForEach-Object { $_.Matches[0].Groups[1].Value }
-        
-        if ($nupkg_file) {
-            Write-Host "Successfully packed: $nupkg_file"
-            # Set the path to the packed nupkg as an output for subsequent steps
-            echo "::set-output name=nupkg_path::$nupkg_file"
-        } else {
-            Write-Error "Failed to find the packed .nupkg file in the output."
-            Write-Host "Output from pack command was:"
-            Write-Host $pack_output
-            exit 1
-        }
-        Write-Host "Contents of output directory:"
-        Get-ChildItem -Path $output_dir -Recurse -Force | Format-Table -AutoSize
+        # Optional: Set the version. If not provided, it will use the project.json version.
+        # If you want to dynamically set it (e.g., using GitHub run number), you can:
+        # package-version: 1.0.${{ github.run_number }} 
 
-
-    # --- NEW: UiPath Deploy Step ---
+    # --- Step 2: Deploy UiPath Package to Orchestrator using UiPath Action ---
     - name: Deploy UiPath Package to Orchestrator
-      shell: pwsh
-      env:
-        # Pass secrets as environment variables, ensures they are masked in logs
-        UIPATH_ORCHESTRATOR_URL: "https://cloud.uipath.com/your-org-name/" # <--- IMPORTANT: Update with your Orchestrator URL
-        UIPATH_TENANT_NAME: "Default" # <--- IMPORTANT: Update with your Tenant Name
-        UIPATH_API_KEY: ${{ secrets.UIPATH_API_KEY }} # Retrieve the API Key from GitHub Secrets
-      run: |
-        $cli_full_path = "${{ env.UIPATH_CLI_FULL_PATH }}"
-        # Get the .nupkg path from the output of the previous 'pack_project' step
-        $nupkg_to_deploy = "${{ steps.pack_project.outputs.nupkg_path }}"
-
-        if ([string]::IsNullOrEmpty($nupkg_to_deploy) -or -not (Test-Path $nupkg_to_deploy -PathType Leaf)) {
-            Write-Error "ERROR: No .nupkg file found to deploy. Ensure the 'Pack UiPath Project' step was successful."
-            exit 1
-        }
-
-        Write-Host "Deploying UiPath package '$nupkg_to_deploy' to Orchestrator..."
-        Write-Host "Orchestrator URL: $env:UIPATH_ORCHESTRATOR_URL"
-        Write-Host "Tenant Name: $env:UIPATH_TENANT_NAME"
+      uses: uipath-actions/deploy-package@v1
+      with:
+        # This retrieves the full path to the .nupkg file that was created
+        # in the 'Pack UiPath Project' step (which had 'id: pack_project').
+        package-path: ${{ steps.pack_project.outputs.package-path }}
         
-        # Execute the deploy command
-        # Note: API key is passed via environment variable for security
-        & "$cli_full_path" deploy `
-          --input "$nupkg_to_deploy" `
-          --orchestrator-url "$env:UIPATH_ORCHESTRATOR_URL" `
-          --tenant-name "$env:UIPATH_TENANT_NAME" `
-          --api-key "$env:UIPATH_API_KEY" `
-          --wait ` # Optional: Wait for the deployment to complete
-          --wait-timeout 300 # Optional: Set a longer timeout for deployment
+        # IMPORTANT: Update with your actual UiPath Orchestrator URL.
+        # Example: 'https://cloud.uipath.com/your-organization-name/'
+        orchestrator-url: 'https://cloud.uipath.com/your-org-name/' 
+        
+        # IMPORTANT: Update with your actual Orchestrator Tenant Name.
+        # Example: 'Default' or a specific tenant name you configured.
+        tenant-name: 'Default' 
+        
+        # Authentication method: Using an API Key (legacy, but common).
+        # This secret (UIPATH_API_KEY) must be created in your GitHub repository's
+        # secrets settings (Repository -> Settings -> Secrets and variables -> Actions).
+        api-key: ${{ secrets.UIPATH_API_KEY }}
+
+        # Optional: If you prefer modern authentication (recommended by UiPath for new setups),
+        # uncomment and use these instead of api-key. You would need to create
+        # 'UIPATH_CLIENT_ID' and 'UIPATH_CLIENT_SECRET' as GitHub Secrets.
+        # client-id: ${{ secrets.UIPATH_CLIENT_ID }}
+        # client-secret: ${{ secrets.UIPATH_CLIENT_SECRET }}
+
+        # Optional: Set a timeout for the deployment step.
+        # Useful for very large packages or if Orchestrator is under heavy load.
+        # Default is usually 300 seconds (5 minutes).
+        timeout-in-seconds: 600 # 10 minutes
+        
+        # Optional: Specify the release name in Orchestrator. If not provided,
+        # it will use the project name from project.json.
+        # release-name: 'MyAutomatedProcess'
+        
+        # Optional: Specify the folder path in Orchestrator where the package should be deployed.
+        # If not specified, it will use the "Default" folder or the folder associated with the API key.
+        # folder-path: 'Shared'
