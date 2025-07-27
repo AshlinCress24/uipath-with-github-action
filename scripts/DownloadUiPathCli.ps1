@@ -2,7 +2,9 @@ param(
     [string]$WorkspacePath
 )
 
+# Official URL for latest UiPath CLI Windows x64 ZIP release (GitHub Releases)
 $cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+
 $cliFileName = "uipathcli-windows-amd64.zip"
 $cliDirName = "uipathcli_" + (Get-Random -Maximum 99999)
 $cliDir = Join-Path $WorkspacePath $cliDirName
@@ -12,6 +14,7 @@ Write-Host "Starting UiPath CLI download and setup from: $cliDownloadUrl"
 Write-Host "Target CLI directory: $cliDir"
 
 try {
+    # Remove old directory if exists
     if (Test-Path $cliDir -PathType Container) {
         Remove-Item -Path $cliDir -Recurse -Force -ErrorAction Stop
         Write-Host "Removed existing CLI directory: $cliDir"
@@ -29,13 +32,17 @@ try {
     Write-Host "Listing files after extraction to diagnose:"
     Get-ChildItem -Path $cliDir -Recurse | ForEach-Object { Write-Host $_.FullName }
 
-    # Try to find the executable with sensitivity to possible casing and locations
-    $cliExePath = Get-ChildItem -Path $cliDir -Recurse -File |
-                  Where-Object { $_.Name -match "^uipathcli\.exe$" } |
-                  Select-Object -First 1
+    # Look for executable named 'uipathcli.exe' or 'uipath.exe'
+    $possibleExecutables = @("uipathcli.exe", "uipath.exe")
+    $cliExePath = $null
+
+    foreach ($exeName in $possibleExecutables) {
+        $cliExePath = Get-ChildItem -Path $cliDir -Filter $exeName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cliExePath) { break }
+    }
 
     if (-not $cliExePath) {
-        Write-Error "Could not find 'uipathcli.exe' in extracted files."
+        Write-Error "Could not find 'uipathcli.exe' or 'uipath.exe' in extracted files."
         exit 1
     }
 
@@ -43,12 +50,15 @@ try {
     $cliFullPath = $cliExePath.FullName
     Write-Host "Found CLI executable at: $cliFullPath"
 
+    # Add CLI directory to PATH for current session
     $env:Path = "$cliExecutablePath;$env:Path"
 
+    # Export environment variables for subsequent GitHub Actions steps
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_FULL_PATH=$cliFullPath"
-    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=uipathcli.exe"
+    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=$($cliExePath.Name)"
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_DIR=$cliExecutablePath"
 
+    # Remove the downloaded ZIP to clean up
     Remove-Item -Path $zipFilePath -Force -ErrorAction SilentlyContinue
 
     Write-Host "UiPath CLI setup completed successfully."
