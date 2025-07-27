@@ -47,25 +47,21 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      # NEW: Use the dedicated UiPath CLI setup action
       - name: Setup UiPath CLI
-        uses: UiPath/setup-uipcli@v1 # This action handles installing the CLI
+        uses: UiPath/setup-uipcli@v1
         with:
           version: '23.4.1' # Specify the desired CLI version. Adjust if a newer stable version is preferred.
 
       - name: Verify UiPath CLI presence and version
         shell: pwsh
         run: |
-          # The setup-uipcli action should add it to PATH. Let's verify.
-          # We'll first try to run 'uipath.cli.exe' directly
-          # If that fails, we'll try 'uipcli.exe' (the older one) as a fallback
           $cliFound = $false
 
           Write-Host "Attempting to verify uipath.cli.exe..."
           try {
-              $cliVersion = & uipath.cli.exe --version 
+              $cliVersion = & uipath.cli.exe --version
               Write-Host "uipath.cli.exe found. Version: $cliVersion"
-              & uipath.cli.exe help # Use 'help' for v2 CLI, not --help
+              & uipath.cli.exe help
               $cliFound = $true
           } catch {
               Write-Host "uipath.cli.exe not found in PATH or failed to execute: $($_.Exception.Message)"
@@ -74,13 +70,12 @@ jobs:
           if (-not $cliFound) {
               Write-Host "Attempting to verify uipcli.exe (older CLI)..."
               try {
-                  $cliVersion = & uipcli.exe --version 
+                  $cliVersion = & uipcli.exe --version
                   Write-Host "uipcli.exe found. Version: $cliVersion"
                   & uipcli.exe --help
                   $cliFound = $true
-                  Write-Warning "Using older uipcli.exe. Consider updating scripts to uipath.cli.exe if possible."
-                  # Set an environment variable to indicate which CLI is found
                   echo "UIPATH_CLI_EXECUTABLE_NAME=uipcli.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+                  Write-Warning "Using older uipcli.exe. Consider updating scripts to uipath.cli.exe if possible."
               } catch {
                   Write-Host "uipcli.exe not found in PATH or failed to execute: $($_.Exception.Message)"
               }
@@ -88,12 +83,10 @@ jobs:
 
           if (-not $cliFound) {
               Write-Error "Neither uipath.cli.exe nor uipcli.exe found in PATH after setup. Exiting."
-              # List PATH for debugging
               Write-Host "Current PATH:"
               $env:PATH.Split(';') | ForEach-Object { Write-Host "  - $_" }
               exit 1
           } else {
-            # Set environment variable if uipath.cli.exe was found (default expectation)
             if (-not $env:UIPATH_CLI_EXECUTABLE_NAME) {
               echo "UIPATH_CLI_EXECUTABLE_NAME=uipath.cli.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
             }
@@ -106,7 +99,8 @@ jobs:
           "${{ github.workspace }}\scripts\UiPathPack.ps1" `
           -project_path "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\${{ env.PROJECT_NAME }}\project.json" `
           -output_path "${{ github.workspace }}\package" `
-          -cli_executable_name "$env:UIPATH_CLI_EXECUTABLE_NAME" # Pass the determined CLI name
+          -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}" # Corrected syntax
+          # Line 104 in the full file
 
       - name: Upload UiPath Artifacts
         uses: actions/upload-artifact@v4
@@ -125,61 +119,12 @@ jobs:
         with:
           name: Artifacts
       
-      # NEW: Use the dedicated UiPath CLI setup action in the publish job too
       - name: Setup UiPath CLI (for Publish Job)
-        uses: UiPath/setup-uipcli@v1 # This action handles installing the CLI
+        uses: UiPath/setup-uipcli@v1
         with:
           version: '23.4.1' # Specify the desired CLI version.
 
       - name: Verify UiPath CLI presence and version (Publish Job)
         shell: pwsh
         run: |
-          # Same verification logic for the publish job
           $cliFound = $false
-          Write-Host "Attempting to verify uipath.cli.exe..."
-          try {
-              $cliVersion = & uipath.cli.exe --version 
-              Write-Host "uipath.cli.exe found. Version: $cliVersion"
-              & uipath.cli.exe help
-              $cliFound = $true
-          } catch {
-              Write-Host "uipath.cli.exe not found in PATH or failed to execute: $($_.Exception.Message)"
-          }
-
-          if (-not $cliFound) {
-              Write-Host "Attempting to verify uipcli.exe (older CLI)..."
-              try {
-                  $cliVersion = & uipcli.exe --version 
-                  Write-Host "uipcli.exe found. Version: $cliVersion"
-                  & uipcli.exe --help
-                  $cliFound = $true
-                  Write-Warning "Using older uipcli.exe. Consider updating scripts to uipath.cli.exe if possible."
-                  echo "UIPATH_CLI_EXECUTABLE_NAME=uipcli.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
-              } catch {
-                  Write-Host "uipcli.exe not found in PATH or failed to execute: $($_.Exception.Message)"
-              }
-          }
-
-          if (-not $cliFound) {
-              Write-Error "Neither uipath.cli.exe nor uipcli.exe found in PATH after setup. Exiting."
-              Write-Host "Current PATH:"
-              $env:PATH.Split(';') | ForEach-Object { Write-Host "  - $_" }
-              exit 1
-          } else {
-             if (-not $env:UIPATH_CLI_EXECUTABLE_NAME) {
-              echo "UIPATH_CLI_EXECUTABLE_NAME=uipath.cli.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
-            }
-          }
-
-      - name: Publish Nuget Package to DEV
-        shell: pwsh
-        run: |
-          # This script will now use the dynamically determined CLI executable name
-          "${{ github.workspace }}\scripts\UiPathDeploy.ps1" `
-          -packages_path "${{ github.workspace }}\package" `
-          -orchestrator_url "${{ env.ORCH_URL }}" `
-          -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
-          -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
-          -client_id "${{ env.ORCH_CLIENT_ID }}" `
-          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
-          -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH
