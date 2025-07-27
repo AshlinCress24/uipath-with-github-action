@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$packages_path,
 
-    [Parameter(Mandary=$true)]
+    [Parameter(Mandatory=$true)]
     [string]$orchestrator_url,
 
     [Parameter(Mandatory=$true)]
@@ -18,56 +18,67 @@ param(
     [string]$client_secret,
 
     [Parameter(Mandatory=$true)]
-    [string]$folder_organization_unit
+    [string]$folder_organization_unit,
+
+    [Parameter(Mandatory=$true)] # New parameter to receive CLI executable name
+    [string]$cli_executable_name 
 )
 
-Write-Host "Starting UiPath Deploy Script (using uipath.cli.exe)..."
+Write-Host "Starting UiPath Deploy Script (using $cli_executable_name)..."
 
-# UPDATED: Directory where uipath.cli.exe resides
-$uipathCliDir = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.CLI\tools"
-$uipathCliExecutable = Join-Path $uipathCliDir "uipath.cli.exe" # <-- IMPORTANT: Changed to uipath.cli.exe
+# The CLI executable should be in PATH, so we just use its name
+$uipathCliExecutable = $cli_executable_name
 
-Write-Host "UiPath CLI Directory: $uipathCliDir"
-Write-Host "UiPath CLI Executable Path: $uipathCliExecutable"
+Write-Host "UiPath CLI Executable: $uipathCliExecutable"
 
-# Verify CLI existence
-if (-not (Test-Path $uipathCliExecutable)) {
-    Write-Error "UiPath CLI executable not found at $uipathCliExecutable. Exiting."
+# Verify CLI existence in PATH
+try {
+    Get-Command $uipathCliExecutable -ErrorAction Stop | Out-Null
+    Write-Host "$uipathCliExecutable found in PATH."
+} catch {
+    Write-Error "$uipathCliExecutable not found in PATH. Make sure the setup-uipcli action successfully installed it and added it to PATH."
     exit 1
 }
 
-# Change directory to where uipath.cli.exe is located for direct execution
-Write-Host "Changing directory to $uipathCliDir"
-Set-Location $uipathCliDir
 
-# 1. Login to Orchestrator using v2.x CLI syntax
-Write-Host "Attempting to login to Orchestrator at $orchestrator_url using uipath.cli.exe..."
+# 1. Login to Orchestrator
+Write-Host "Attempting to login to Orchestrator at $orchestrator_url using $uipathCliExecutable..."
 
-# UPDATED COMMAND SYNTAX FOR UIPATH.CLI.EXE (v2.x) login
-# The v2 CLI uses a more direct 'login' command, sometimes preferring interactive login or
-# simpler client-credentials directly at the top level.
-# Let's use the 'orchestrator' sub-command if available, which it should be.
-$loginArgs = @(
-    "orchestrator",
-    "login",
-    "--url", $orchestrator_url,
-    "--organization-name", $organization_name,
-    "--tenant-name", $orchestrator_tenant,
-    "--client-id", $client_id,
-    "--client-secret", $client_secret
-)
+# Login command syntax depends on CLI version
+if ($cli_executable_name -eq "uipath.cli.exe") {
+    Write-Host "Using uipath.cli.exe (v2) syntax for 'orchestrator login'..."
+    $loginArgs = @(
+        "orchestrator",
+        "login",
+        "--url", $orchestrator_url,
+        "--organization-name", $organization_name,
+        "--tenant-name", $orchestrator_tenant,
+        "--client-id", $client_id,
+        "--client-secret", $client_secret
+    )
+} elseif ($cli_executable_name -eq "uipcli.exe") {
+    Write-Host "Using uipcli.exe (v1) syntax for 'orchestrator login'..."
+    $loginArgs = @(
+        "orchestrator",
+        "login",
+        "--url", $orchestrator_url,
+        "--organization-name", $organization_name,
+        "--tenant-name", $orchestrator_tenant,
+        "--client-id", $client_id,
+        "--client-secret", $client_secret
+    )
+} else {
+    Write-Error "Unknown CLI executable name: $cli_executable_name. Cannot determine login syntax."
+    exit 1
+}
 
-# If the above fails, you might need to use a simpler `login` for the v2 CLI
-# depending on its exact version and capabilities. The v2 CLI is designed to be more
-# context-aware, so `orchestrator login` is common.
-
-& ".\uipath.cli.exe" $loginArgs # Execute from current directory
+& $uipathCliExecutable $loginArgs
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI 'orchestrator login' command failed with exit code $LASTEXITCODE."
     exit $LASTEXITCODE
 } else {
-    Write-Host "Successfully logged in to UiPath Orchestrator using uipath.cli.exe."
+    Write-Host "Successfully logged in to UiPath Orchestrator using $uipathCliExecutable."
 }
 
 # 2. Publish the NuGet package
@@ -82,34 +93,52 @@ if ($null -eq $packageFile) {
 $packagePath = $packageFile.FullName
 Write-Host "Found package: $packagePath"
 
-Write-Host "Attempting to publish package to folder: $folder_organization_unit using uipath.cli.exe..."
+Write-Host "Attempting to publish package to folder: $folder_organization_unit using $uipathCliExecutable..."
 
-# UPDATED COMMAND SYNTAX FOR UIPATH.CLI.EXE (v2.x) publish
-# The 'publish' command in v2 CLI is typically 'uipath.cli.exe orchestrator publish'
-$publishArgs = @(
-    "orchestrator",
-    "publish",
-    "--file", $packagePath, # Changed from --package-path to --file
-    "--folder", $folder_organization_unit
-)
+# Publish command syntax depends on CLI version
+if ($cli_executable_name -eq "uipath.cli.exe") {
+    Write-Host "Using uipath.cli.exe (v2) syntax for 'orchestrator publish'..."
+    $publishArgs = @(
+        "orchestrator",
+        "publish",
+        "--file", $packagePath, # v2 uses --file
+        "--folder", $folder_organization_unit
+    )
+} elseif ($cli_executable_name -eq "uipcli.exe") {
+    Write-Host "Using uipcli.exe (v1) syntax for 'orchestrator publish'..."
+    $publishArgs = @(
+        "orchestrator",
+        "publish",
+        "--package-path", $packagePath, # v1 uses --package-path
+        "--folder", $folder_organization_unit
+    )
+} else {
+    Write-Error "Unknown CLI executable name: $cli_executable_name. Cannot determine publish syntax."
+    exit 1
+}
 
-& ".\uipath.cli.exe" $publishArgs # Execute from current directory
+& $uipathCliExecutable $publishArgs
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI 'orchestrator publish' command failed with exit code $LASTEXITCODE."
     exit $LASTEXITCODE
 } else {
-    Write-Host "UiPath package published successfully using uipath.cli.exe."
+    Write-Host "UiPath package published successfully using $uipathCliExecutable."
 }
 
 # 3. Logout (optional, but good practice)
-Write-Host "Logging out from UiPath Orchestrator using uipath.cli.exe..."
-& ".\uipath.cli.exe" orchestrator logout
+Write-Host "Logging out from UiPath Orchestrator using $uipathCliExecutable..."
+
+if ($cli_executable_name -eq "uipath.cli.exe") {
+    & $uipathCliExecutable orchestrator logout
+} elseif ($cli_executable_name -eq "uipcli.exe") {
+    & $uipathCliExecutable orchestrator logout
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "UiPath CLI 'orchestrator logout' command failed with exit code $LASTEXITCODE. Proceeding anyway."
 } else {
-    Write-Host "Successfully logged out from UiPath Orchestrator using uipath.cli.exe."
+    Write-Host "Successfully logged out from UiPath Orchestrator using $uipathCliExecutable."
 }
 
 Write-Host "Finished UiPath Deploy Script."
