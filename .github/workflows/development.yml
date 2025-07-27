@@ -11,19 +11,18 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download UiPath CLI
-        shell: pwsh
-        run: pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath ${{ github.workspace }}
+      - name: Setup UiPath CLI
+        uses: Mikael-RnD/setup-uipath@v2
+        with:
+          version: latest  # Use 'latest' or specify version like '2.0.44'
 
       - name: Pack UiPath Project
         shell: pwsh
-        env:
-          UIPATH_CLI_EXECUTABLE_NAME: ${{ env.UIPATH_CLI_EXECUTABLE_NAME }}
-          PATH: ${{ env.PATH }}
         run: pwsh ./scripts/UiPathPack.ps1 `
           -project_path "${{ github.workspace }}/project.json" `
           -output_path "${{ github.workspace }}/output_packages"
@@ -37,13 +36,15 @@ jobs:
   deploy:
     runs-on: windows-latest
     needs: build
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download UiPath CLI
-        shell: pwsh
-        run: pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath ${{ github.workspace }}
+      - name: Setup UiPath CLI
+        uses: Mikael-RnD/setup-uipath@v2
+        with:
+          version: latest
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
@@ -59,8 +60,6 @@ jobs:
           ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
           ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
           ORCH_URL: ${{ secrets.ORCH_URL }}
-          UIPATH_CLI_EXECUTABLE_NAME: ${{ env.UIPATH_CLI_EXECUTABLE_NAME }}
-          PATH: ${{ env.PATH }}
         run: pwsh ./scripts/UiPathDeploy.ps1 `
           -packages_path "${{ github.workspace }}/downloaded_packages" `
           -orchestrator_url "${{ env.ORCH_URL }}" `
