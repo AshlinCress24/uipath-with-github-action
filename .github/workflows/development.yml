@@ -26,7 +26,9 @@ jobs:
           pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath $workspace
 
           Write-Host "Locating extracted UiPath CLI directory..."
-          $cliDir = Get-ChildItem -Path $workspace -Directory | Where-Object { $_.Name -like $cliDirNamePattern } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $cliDir = Get-ChildItem -Path $workspace -Directory |
+            Where-Object { $_.Name -like $cliDirNamePattern } |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
           if (-not $cliDir) {
             Write-Error "Cannot find UiPath CLI directory after download."
@@ -75,7 +77,9 @@ jobs:
           pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath $workspace
 
           Write-Host "Locating extracted UiPath CLI directory..."
-          $cliDir = Get-ChildItem -Path $workspace -Directory | Where-Object { $_.Name -like $cliDirNamePattern } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $cliDir = Get-ChildItem -Path $workspace -Directory |
+            Where-Object { $_.Name -like $cliDirNamePattern } |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
           if (-not $cliDir) {
             Write-Error "Cannot find UiPath CLI directory after download."
@@ -105,7 +109,7 @@ jobs:
           ORCH_URL: ${{ secrets.ORCH_URL }}
         run: |
           pwsh ./scripts/UiPathDeploy.ps1 `
-            -packages_path "${{ github.workspace }}/downloaded_packages" `
+            -packages_path "$workspace/downloaded_packages" `
             -orchestrator_url "$env:ORCH_URL" `
             -organization_name "$env:ORCH_ORGANIZATION_NAME" `
             -orchestrator_tenant "$env:ORCH_TENANT" `
