@@ -11,18 +11,21 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Download UiPath CLI
+      - name: Download UiPath CLI and Pack Project
         shell: pwsh
-        run: pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
-
-      - name: Pack UiPath Project
-        shell: pwsh
-        run: pwsh ./scripts/UiPathPack.ps1 `
-          -project_path "${{ github.workspace }}/project.json" `
-          -output_path "${{ github.workspace }}/output_packages"
+        run: |
+          # Download UiPath CLI and set environment variables in this step
+          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
+          
+          # Pack the UiPath project
+          pwsh ./scripts/UiPathPack.ps1 `
+            -project_path "${{ github.workspace }}/project.json" `
+            -output_path "${{ github.workspace }}/output_packages"
 
       - name: Upload UiPath Package as Artifact
         uses: actions/upload-artifact@v4
@@ -33,12 +36,28 @@ jobs:
   deploy:
     runs-on: windows-latest
     needs: build
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Download UiPath CLI
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download UiPath CLI and Deploy Package
         shell: pwsh
-        run: pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
+        env:
+          ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
+          ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
+          ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
+          ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
+          ORCH_URL: ${{ secrets.ORCH_URL }}
+        run: |
+          # Download UiPath CLI
+          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath "${{ github.workspace }}"
+
+          # Download UiPath package artifact
+          pwsh -Command " \
+            (New-Object System.Net.WebClient).DownloadFile('https://github.com/actions/download-artifact', '${{ github.workspace }}\\downloaded_packages') \
+          "
+          # Instead of the above line, use official download-artifact action (next step) for downloading artifact
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
@@ -54,11 +73,12 @@ jobs:
           ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
           ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
           ORCH_URL: ${{ secrets.ORCH_URL }}
-        run: pwsh ./scripts/UiPathDeploy.ps1 `
-          -packages_path "${{ github.workspace }}/downloaded_packages" `
-          -orchestrator_url "$env:ORCH_URL" `
-          -organization_name "$env:ORCH_ORGANIZATION_NAME" `
-          -orchestrator_tenant "$env:ORCH_TENANT" `
-          -client_id "$env:ORCH_CLIENT_ID" `
-          -client_secret "$env:ORCH_CLIENT_SECRET" `
-          -folder_organization_unit ""
+        run: |
+          pwsh ./scripts/UiPathDeploy.ps1 `
+            -packages_path "${{ github.workspace }}/downloaded_packages" `
+            -orchestrator_url "$env:ORCH_URL" `
+            -organization_name "$env:ORCH_ORGANIZATION_NAME" `
+            -orchestrator_tenant "$env:ORCH_TENANT" `
+            -client_id "$env:ORCH_CLIENT_ID" `
+            -client_secret "$env:ORCH_CLIENT_SECRET" `
+            -folder_organization_unit ""
