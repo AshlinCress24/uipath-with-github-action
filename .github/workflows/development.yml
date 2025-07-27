@@ -39,8 +39,15 @@ jobs:
           Write-Host "Adding CLI directory to PATH for current session..."
           $env:Path = "$($cliDir.FullName);$env:Path"
 
-          Write-Host "Setting UIPATH_CLI_EXECUTABLE_NAME environment variable..."
-          $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
+          # Use the executable name set by DownloadUiPathCli.ps1, default fallback to uipathcli.exe
+          $execNamePath = Join-Path $cliDir.FullName "uipathcli.exe"
+          if (-not (Test-Path $execNamePath)) {
+            # fallback in case executable name is uipath.exe
+            $execNamePath = Join-Path $cliDir.FullName "uipath.exe"
+          }
+          $env:UIPATH_CLI_EXECUTABLE_NAME = [System.IO.Path]::GetFileName($execNamePath)
+
+          Write-Host "Using CLI executable: $env:UIPATH_CLI_EXECUTABLE_NAME"
 
           Write-Host "Starting UiPath Pack..."
           pwsh ./scripts/UiPathPack.ps1 `
@@ -90,9 +97,34 @@ jobs:
           Write-Host "Adding CLI directory to PATH for current session..."
           $env:Path = "$($cliDir.FullName);$env:Path"
 
-          Write-Host "Setting UIPATH_CLI_EXECUTABLE_NAME environment variable..."
-          $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
+          $execNamePath = Join-Path $cliDir.FullName "uipathcli.exe"
+          if (-not (Test-Path $execNamePath)) {
+            $execNamePath = Join-Path $cliDir.FullName "uipath.exe"
+          }
+          $env:UIPATH_CLI_EXECUTABLE_NAME = [System.IO.Path]::GetFileName($execNamePath)
 
+          Write-Host "Using CLI executable: $env:UIPATH_CLI_EXECUTABLE_NAME"
+
+          Write-Host "Downloading UiPath package artifact..."
+          # Artifact downloaded in next step
+
+      - name: Download UiPath Package Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: uipath-package
+          path: ${{ github.workspace }}/downloaded_packages
+
+      - name: Deploy UiPath Package to Orchestrator
+        shell: pwsh
+        env:
+          ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
+          ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
+          ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
+          ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
+          ORCH_URL: ${{ secrets.ORCH_URL }}
+          UIPATH_CLI_EXECUTABLE_NAME: ${{ env.UIPATH_CLI_EXECUTABLE_NAME }}
+          PATH: ${{ env.PATH }}  # Ensure PATH inheritance
+        run: |
           Write-Host "Running UiPath Deploy Script..."
           pwsh ./scripts/UiPathDeploy.ps1 `
             -packages_path "$workspace/downloaded_packages" `
