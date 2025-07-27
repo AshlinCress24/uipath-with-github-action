@@ -92,10 +92,12 @@ jobs:
         Write-Host "Attempting to get UiPath CLI version..."
         $versionFound = $false
         
-        # Use a try/finally block to ensure that even if version commands fail, the step doesn't
+        # Try/Catch for version commands to prevent step failure on non-critical errors
         try {
             # 1. Try running the executable directly to see if it prints version info
-            $rawOutput = & "$cli_full_path" 2>&1 | Out-String
+            # Redirect stderr to stdout (2>&1) and then process as string.
+            # Use -ErrorAction SilentlyContinue for the external command to prevent PS from throwing.
+            $rawOutput = & "$cli_full_path" 2>&1 | Out-String -ErrorAction SilentlyContinue
             if ($rawOutput -match "version (\d+\.\d+\.\d+)") { # Look for a pattern like "version X.Y.Z"
                 Write-Host "UiPath CLI Version (from raw output): $($Matches[1])"
                 $versionFound = $true
@@ -110,7 +112,8 @@ jobs:
             if (-not $versionFound) {
                 Write-Host "Trying '$cli_full_path identity --version'..."
                 try {
-                    $identityVersionOutput = & "$cli_full_path" identity --version 2>&1 | Out-String
+                    # Explicitly suppress errors for this command
+                    $identityVersionOutput = & "$cli_full_path" identity --version 2>&1 | Out-String -ErrorAction SilentlyContinue
                     if ($identityVersionOutput -match "version (\d+\.\d+\.\d+)") {
                         Write-Host "UiPath CLI Version (from 'identity --version'): $($Matches[1])"
                         $versionFound = $true
@@ -123,6 +126,10 @@ jobs:
                 }
             }
         }
+        catch {
+            # This catch block will only execute if a *terminating* error occurred.
+            Write-Host "Warning: A terminating error occurred while attempting to get UiPath CLI version. Error: $($_.Exception.Message)"
+        }
         finally {
             if (-not $versionFound) {
                 Write-Host "Info: Could not reliably retrieve UiPath CLI version using common methods."
@@ -131,6 +138,20 @@ jobs:
             }
         }
         
+        # IMPORTANT: At the end of this step, ensure no non-zero exit code is propagated from non-critical checks.
+        # If any command inside the 'run' block exits with a non-zero code, the step will fail.
+        # If all critical checks (path, existence, size, --help) passed, we can ensure the step exits with 0.
+        exit 0 # Explicitly exit with 0 to ensure the step passes if all critical checks were successful.
+
         # Further UiPath CLI commands would go here, e.g., for packing/deploying
-        # uipath pack ...
-        # uipath deploy ...
+        # - name: UiPath Pack
+        #   shell: pwsh
+        #   run: |
+        #     Write-Host "Packing UiPath project..."
+        #     & "${{ env.UIPATH_CLI_FULL_PATH }}" pack --input path/to/your/project.json --output path/for/nuget/package
+        
+        # - name: UiPath Deploy
+        #   shell: pwsh
+        #   run: |
+        #     Write-Host "Deploying UiPath package..."
+        #     & "${{ env.UIPATH_CLI_FULL_PATH }}" deploy --input path/to/your/package.nupkg --orchestrator-url "https://cloud.uipath.com/your-org-name/" --tenant-name "Default" --api-key "${{ secrets.UIPATH_API_KEY }}"
