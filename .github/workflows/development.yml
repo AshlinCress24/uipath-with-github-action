@@ -50,24 +50,41 @@ jobs:
       - name: Manually Setup UiPath CLI
         shell: pwsh
         run: |
-          $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
-          New-Item -ItemType Directory -Force -Path $installPath
-          
-          $downloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
-          Write-Host "Downloading UiPath CLI from $downloadUrl"
-          Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
-          
+          $cliDir = "${{ github.workspace }}\uipathcli"
+          $installPath = $cliDir
+          $zipPath = Join-Path $installPath "uipathcli.zip"
+
+          # Changed URL to download v1.18.0 of uipcli.exe - CORRECT!
+          $DownloadUrl = "https://download.uipath.com/platform/uipath-cli-v1.18.0.zip"
+
+          Write-Host "Creating CLI directory: $installPath"
+          New-Item -ItemType Directory -Path $installPath -Force | Out-Null
+
+          Write-Host "Downloading UiPath CLI from $DownloadUrl to $zipPath"
+          Invoke-WebRequest -Uri $DownloadUrl -OutFile $zipPath
+
           Write-Host "Extracting UiPath CLI to $installPath"
-          Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
-          
-          Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
+          Expand-Archive -Path $zipPath -DestinationPath $installPath -Force
+
+          Write-Host "Adding UiPath CLI to PATH: $installPath"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
+
+          Write-Host "Verifying uipcli.exe presence and version..."
+          $cliExePath = Join-Path $installPath "uipcli.exe" # CORRECT: refers to uipcli.exe
+          if (Test-Path $cliExePath) {
+              Write-Host "uipcli.exe found at: $cliExePath"
+              & $cliExePath --version
+              & $cliExePath --help
+          } else {
+              Write-Error "uipcli.exe not found after extraction!"
+              exit 1
+          }
       
       - name: Verify Extracted CLI Content and Commands (Diagnostic)
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "uipath.exe" # Confirmed this is the correct executable name
+          $cliExePath = Join-Path $cliDir "uipcli.exe" # FIX: Changed to uipcli.exe
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
@@ -78,7 +95,7 @@ jobs:
               & $cliExePath --version
               Write-Host "Running '${cliExePath} --help':"
               & $cliExePath --help
-              Write-Host "Skipping 'package --help' check as it's not a top-level command for this CLI version."
+              # FIX: Removed the "Skipping 'package --help' check" line, it's not relevant here
           } else {
               Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
@@ -87,7 +104,10 @@ jobs:
       - name: Build Nuget Package
         shell: pwsh
         run: |
-          ${{ github.workspace }}\scripts\UiPathPack.ps1 ${{ github.workspace }}\project.json -destination_folder ${{ github.workspace }}\package
+          # The UiPathPack.ps1 script must also be updated to use uipcli.exe and its syntax
+          ${{ github.workspace }}\scripts\UiPathPack.ps1 `
+          -project_path "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\${{ env.PROJECT_NAME }}\project.json" `
+          -output_path "${{ github.workspace }}\package"
 
       - name: Upload UiPath Artifacts
         uses: actions/upload-artifact@v4
@@ -112,7 +132,8 @@ jobs:
           $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
           New-Item -ItemType Directory -Force -Path $installPath
           
-          $downloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+          # FIX: Changed URL to download v1.18.0 of uipcli.exe
+          $downloadUrl = "https://download.uipath.com/platform/uipath-cli-v1.18.0.zip"
           Write-Host "Downloading UiPath CLI from $downloadUrl"
           Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
           
@@ -126,7 +147,7 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "uipath.exe"
+          $cliExePath = Join-Path $cliDir "uipcli.exe" # FIX: Changed to uipcli.exe
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
@@ -137,7 +158,7 @@ jobs:
               & $cliExePath --version
               Write-Host "Running '${cliExePath} --help':"
               & $cliExePath --help
-              Write-Host "Skipping 'package --help' check as it's not a top-level command for this CLI version."
+              # FIX: Removed the "Skipping 'package --help' check" line
           } else {
               Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
@@ -146,6 +167,7 @@ jobs:
       - name: Publish Nuget Package to DEV
         shell: pwsh
         run: |
+          # The UiPathDeploy.ps1 script must also be updated to use uipcli.exe and its syntax
           ${{ github.workspace }}\scripts\UiPathDeploy.ps1 `
           -packages_path "${{ github.workspace }}\package" `
           -orchestrator_url "${{ env.ORCH_URL }}" `
