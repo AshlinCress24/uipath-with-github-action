@@ -23,9 +23,8 @@ param(
 
 Write-Host "Starting UiPath Deploy Script..."
 
-# The directory where uipcli.exe resides after NuGet extraction
-# Make sure this path matches the version and structure from development.yml
-$uipathCliDir = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.CLI.23.4.1\tools"
+# UPDATED PATH: The directory where uipcli.exe resides after extraction from UiPath.Automation.Cloud.Activities
+$uipathCliDir = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.Automation.Cloud.Activities.1.21.0\tools"
 $uipathCliExecutable = Join-Path $uipathCliDir "uipcli.exe"
 
 Write-Host "UiPath CLI Directory: $uipathCliDir"
