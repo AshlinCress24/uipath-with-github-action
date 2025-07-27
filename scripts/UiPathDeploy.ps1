@@ -1,84 +1,106 @@
 param(
     [Parameter(Mandatory=$true)]
     [string]$packages_path,
+
     [Parameter(Mandatory=$true)]
     [string]$orchestrator_url,
+
     [Parameter(Mandatory=$true)]
     [string]$organization_name,
+
     [Parameter(Mandatory=$true)]
     [string]$orchestrator_tenant,
+
     [Parameter(Mandatory=$true)]
     [string]$client_id,
+
     [Parameter(Mandatory=$true)]
     [string]$client_secret,
+
     [Parameter(Mandatory=$true)]
     [string]$folder_organization_unit
 )
 
-Write-Host "Starting UiPath Package Deployment (using older CLI version)..."
+Write-Host "Starting UiPath Deploy Script..."
 
-# Define the full path to uipcli.exe (note: no 'h' in uipcli for older versions)
-$uipathCliDir = "$env:GITHUB_WORKSPACE\uipathcli"
+# The directory where uipcli.exe resides after NuGet extraction
+# Make sure this path matches the version and structure from development.yml
+$uipathCliDir = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.CLI.23.4.1\tools"
 $uipathCliExecutable = Join-Path $uipathCliDir "uipcli.exe"
 
-# Get the latest .nupkg file in the packages_path
-$nupkgFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Write-Host "UiPath CLI Directory: $uipathCliDir"
+Write-Host "UiPath CLI Executable Path: $uipathCliExecutable"
 
-if (-not $nupkgFile) {
-    Write-Error "No .nupkg file found in $packages_path"
+# Verify CLI existence
+if (-not (Test-Path $uipathCliExecutable)) {
+    Write-Error "UiPath CLI executable not found at $uipathCliExecutable. Exiting."
     exit 1
 }
 
-$nupkgFullPath = $nupkgFile.FullName
-Write-Host "Found package: $nupkgFullPath"
+# Change directory to where uipcli.exe is located for direct execution
+Write-Host "Changing directory to $uipathCliDir"
+Set-Location $uipathCliDir
 
-Write-Host "Authenticating to Orchestrator using 'orchestrator login'..."
-# For older CLI versions, 'orchestrator login' with client-credentials is common
-# This might also implicitly handle the identity server URL.
-# Ensure the URL is just the base cloud URL, not tenant-specific.
+# 1. Login to Orchestrator using v1.x CLI syntax
+Write-Host "Attempting to login to Orchestrator at $orchestrator_url..."
+
 $loginArgs = @(
-    "orchestrator", "login",
-    "--url", "$orchestrator_url",
-    "--organization-name", "$organization_name",
-    "--tenant", "$orchestrator_tenant",
-    "--client-id", "$client_id",
-    "--client-secret", "$client_secret"
+    "orchestrator",
+    "login",
+    "--url", $orchestrator_url,
+    "--organization-name", $organization_name,
+    "--tenant-name", $orchestrator_tenant,
+    "--client-id", $client_id,
+    "--client-secret", $client_secret
 )
 
-Write-Host "Login command string being passed: '$uipathCliExecutable $($loginArgs -join ' ')'"
-
-$originalLocation = Get-Location
-Set-Location $uipathCliDir
-
-& ".\uipathcli.exe" $loginArgs # Use uipcli.exe
-
-Set-Location $originalLocation
+& ".\uipcli.exe" $loginArgs # Execute from current directory
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'orchestrator login' command failed with exit code $LASTEXITCODE"
+    Write-Error "UiPath CLI 'orchestrator login' command failed with exit code $LASTEXITCODE."
+    exit $LASTEXITCODE
+} else {
+    Write-Host "Successfully logged in to UiPath Orchestrator."
+}
+
+# 2. Publish the NuGet package
+Write-Host "Searching for packages in: $packages_path"
+$packageFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Select-Object -First 1
+
+if ($null -eq $packageFile) {
+    Write-Error "No .nupkg file found in $packages_path. Exiting."
     exit 1
 }
 
-Write-Host "Publishing package to Orchestrator folder: $folder_organization_unit"
-# The publish command syntax should be similar, just ensuring uipcli.exe is used
+$packagePath = $packageFile.FullName
+Write-Host "Found package: $packagePath"
+
+Write-Host "Attempting to publish package to folder: $folder_organization_unit"
+
 $publishArgs = @(
-    "orchestrator", "publish",
-    "--file", "$nupkgFullPath",
-    "--folder-path", "$folder_organization_unit"
+    "orchestrator",
+    "publish",
+    "--package-path", $packagePath,
+    "--folder", $folder_organization_unit
 )
 
-Write-Host "Publish command string being passed: '$uipathCliExecutable $($publishArgs -join ' ')'"
-
-$originalLocation = Get-Location # Get again in case previous was skipped
-Set-Location $uipathCliDir
-
-& ".\uipathcli.exe" $publishArgs # Use uipcli.exe
-
-Set-Location $originalLocation
+& ".\uipcli.exe" $publishArgs # Execute from current directory
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'orchestrator publish' command failed with exit code $LASTEXITCODE"
-    exit 1
+    Write-Error "UiPath CLI 'orchestrator publish' command failed with exit code $LASTEXITCODE."
+    exit $LASTEXITCODE
+} else {
+    Write-Host "UiPath package published successfully."
 }
 
-Write-Host "UiPath Package Deployment Completed."
+# 3. Logout (optional, but good practice)
+Write-Host "Logging out from UiPath Orchestrator..."
+& ".\uipcli.exe" orchestrator logout
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "UiPath CLI 'orchestrator logout' command failed with exit code $LASTEXITCODE. Proceeding anyway."
+} else {
+    Write-Host "Successfully logged out from UiPath Orchestrator."
+}
+
+Write-Host "Finished UiPath Deploy Script."
