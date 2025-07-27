@@ -4,15 +4,23 @@ param(
     [string]$WorkspacePath
 )
 
-# !! IMPORTANT: Update this URL to a currently valid UiPath CLI download !!
-# YOU MUST VERIFY this URL is active and provides the UiPathStudioCli.zip file.
-# As of current date (July 27, 2025), versions like 23.10.8 might be outdated.
-# Search UiPath's official site (e.g., https://download.uipath.com/) for a current version.
-# Example: If 24.4.1 is the latest, the URL might look like:
-# "https://download.uipath.com/versions/24.4.1/UiPathStudioCli.zip"
-$cliDownloadUrl = "https://download.uipath.com/versions/LATEST_VALID_VERSION/UiPathStudioCli.zip" 
-# Replace LATEST_VALID_VERSION with the actual version number you find.
-# For example, it might be "https://download.uipath.com/versions/24.4.1/UiPathStudioCli.zip" if 24.4.1 is valid.
+# !! IMPORTANT: YOU MUST UPDATE THIS URL !!
+# As of today, Sunday, July 27, 2025, you need to find a currently valid direct download link
+# for 'UiPathStudioCli.zip' from UiPath's official website.
+#
+# How to find it:
+# 1. Go to UiPath's official download site (e.g., https://download.uipath.com/ or their documentation).
+# 2. Look for releases or enterprise installers. The CLI is typically part of or available alongside UiPath Studio.
+# 3. Find a stable version, preferably an LTS (Long Term Support) version, like a recent 2024.x.x or 2023.x.x release.
+# 4. The URL should generally follow the pattern:
+#    "https://download.uipath.com/versions/<ACTUAL_VERSION_NUMBER>/UiPathStudioCli.zip"
+#
+# EXAMPLE (DO NOT USE WITHOUT VERIFICATION - THIS IS JUST AN EXAMPLE OF WHAT IT MIGHT LOOK LIKE):
+# $cliDownloadUrl = "https://download.uipath.com/versions/2024.4.1/UiPathStudioCli.zip"
+# $cliDownloadUrl = "https://download.uipath.com/versions/23.10.8/UiPathStudioCli.zip"
+#
+# REPLACE THE FOLLOWING PLACEHOLDER URL WITH THE ACTUAL, WORKING URL YOU FIND:
+$cliDownloadUrl = "https://download.uipath.com/versions/PUT_YOUR_VERIFIED_UI_PATH_CLI_VERSION_HERE/UiPathStudioCli.zip" 
 
 
 $cliZipPath = Join-Path $WorkspacePath "UiPathStudioCli.zip"
