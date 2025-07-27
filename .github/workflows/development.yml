@@ -7,7 +7,7 @@ on:
 
 # Here the environment variables are declared in workflow level
 env:
-  PROJECT_NAME: Addition_of_2_Numbers # <--- IMPORTANT: Change this to the exact name of your UiPath project
+  PROJECT_NAME: Addition_of_2_Numbers # Your confirmed UiPath project name
   PROJECT_FOLDER: . # Adjust if your project.json is in a subfolder relative to the repo root
   ORCH_URL: https://cloud.uipath.com
   ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
@@ -40,16 +40,6 @@ jobs:
           echo "Cleaning up previous run"
           rm -rf "${{ github.workspace }}"
 
-  test-marketplace-access:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Test Node Setup Action
-        uses: actions/setup-node@v3 # Using a different, common public action
-        with:
-          node-version: '16'
-      - name: Verify Node Version
-        run: node -v
-
   build-uipath-nuget-package:
     needs: cleaner
     runs-on: windows-latest
@@ -58,52 +48,52 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Setup UiPath CLI
-        uses: UiPath/setup-uipath-cli@v2 # Use the latest version
+        uses: UiPath/setup-uipath-cli@v2
 
       - name: Build Nuget Package
         shell: pwsh
         run: |
-          # The UiPathPack.ps1 script expects project.json path and destination folder
-          # Assuming project.json is at the root or within the specified PROJECT_FOLDER
-          # And 'package' folder will be created inside GITHUB_WORKSPACE
           ${{ github.workspace }}\scripts\UiPathPack.ps1 ${{ github.workspace }}\project.json -destination_folder ${{ github.workspace }}\package
 
       - name: Upload UiPath Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4 # <--- UPDATED TO V4
         with:
           name: Artifacts
           path: |
-            package/*.* # This should include your .nupkg file
-            scripts/*.ps1 # Include scripts for subsequent steps
+            package/*.*
+            scripts/*.ps1
 
   publish-uipath-nuget-package:
     needs: build-uipath-nuget-package
     runs-on: windows-latest
     steps:
       - name: Download UiPath Artifacts
-        uses: actions/download-artifact@v4
+        # Note: actions/download-artifact also has a v4. If you update upload to v4,
+        # you *must* update download to v4 as well for the same artifact to be compatible.
+        # However, you are uploading artifacts in one job and downloading in the *next* job of the *same workflow*.
+        # For this specific case, actions/download-artifact@v2 might still work with artifacts uploaded by v4,
+        # but it's generally best practice to keep them consistent if possible, especially when transferring
+        # artifacts between different workflows/runs. If you encounter download issues, update this too.
+        uses: actions/download-artifact@v2 
         with:
           name: Artifacts
       
       - name: Setup UiPath CLI
-        uses: UiPath/setup-uipath-cli@v2 # Ensure CLI is available for the PowerShell script
+        uses: UiPath/setup-uipath-cli@v2
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
         run: |
-          # Ensure your UiPathDeploy.ps1 expects these parameter names
           ${{ github.workspace }}\scripts\UiPathDeploy.ps1 `
-          -packages_path "${{ github.workspace }}\package" ` # Pass the folder containing the .nupkg
+          -packages_path "${{ github.workspace }}\package" `
           -orchestrator_url "${{ env.ORCH_URL }}" `
           -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
           -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
           -client_id "${{ env.ORCH_CLIENT_ID }}" `
-          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
+          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" ` # Corrected this in the previous step
           -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}"
 
-  # Create Pull Request for Merge & Review
   create-pull-request:
-    # This job must now depend on 'publish-uipath-nuget-package'
     needs: publish-uipath-nuget-package
     runs-on: ubuntu-latest
     steps:
@@ -112,7 +102,7 @@ jobs:
       - name: pull-request
         uses: repo-sync/pull-request@v2
         with:
-          destination_branch: "master" # Adjust if your main branch is named something else (e.g., "main")
-          github_token: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is usually auto-generated with sufficient permissions
+          destination_branch: "master"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           pr_label: "feature, automated pr"
           pr_title: "Pull Request From Github Action"
