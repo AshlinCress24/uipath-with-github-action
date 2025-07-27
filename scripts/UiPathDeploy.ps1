@@ -23,7 +23,7 @@ param(
 
 Write-Host "Starting UiPath Deploy Script (using uipathcli)..."
 
-# Verify uipathcli command is available
+# Verify 'uipathcli' is available
 if (-not (Get-Command "uipathcli" -ErrorAction SilentlyContinue)) {
     Write-Error "UiPath CLI 'uipathcli' executable not found in PATH."
     exit 1
@@ -34,7 +34,7 @@ if (-not (Test-Path $packages_path -PathType Container)) {
     exit 1
 }
 
-# Find the most recent package .nupkg file
+# Find the latest package file (.nupkg)
 $packageFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if (-not $packageFile) {
@@ -44,15 +44,14 @@ if (-not $packageFile) {
 
 Write-Host "Using package file: $($packageFile.FullName)"
 
-# Login to UiPath Orchestrator with client credentials
+# Login to UiPath Orchestrator
 Write-Host "Logging into UiPath Orchestrator..."
-
 $loginArgs = @(
-    "login",
-    "--client-id", "`"$client_id`"",
-    "--client-secret", "`"$client_secret`"",
-    "--tenant-name", "`"$orchestrator_tenant`"",
-    "--url", "`"$orchestrator_url`""
+    "orchestrator", "login",
+    "--client-id", $client_id,
+    "--client-secret", $client_secret,
+    "--tenant-name", $orchestrator_tenant,
+    "--url", $orchestrator_url
 )
 
 $loginProcess = Start-Process -FilePath "uipathcli" -ArgumentList $loginArgs -NoNewWindow -Wait -PassThru
@@ -62,14 +61,12 @@ if ($loginProcess.ExitCode -ne 0) {
     exit $loginProcess.ExitCode
 }
 
-# Publish the package to Orchestrator
+# Publish the package
 Write-Host "Publishing package to Orchestrator..."
-
 $publishArgs = @(
-    "package",
-    "publish",
-    "--path", "`"$($packageFile.FullName)`"",
-    "--folder", "`"$folder_organization_unit`""
+    "studio", "package", "publish",
+    "--path", $packageFile.FullName,
+    "--folder", $folder_organization_unit
 )
 
 $publishProcess = Start-Process -FilePath "uipathcli" -ArgumentList $publishArgs -NoNewWindow -Wait -PassThru
