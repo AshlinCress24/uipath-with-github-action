@@ -56,9 +56,9 @@ jobs:
           # --- NEW CLI INSTALLATION METHOD: Download UiPath.CLI from MyGet feed ---
           $nugetExeUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
           $nugetExePath = Join-Path $installPath "nuget.exe"
-          $cliPackageId = "UiPath.CLI" # FIX: Changed to UiPath.CLI (without .Windows)
-          $cliPackageVersion = "23.4.1" # FIX: This version is known to contain uipcli.exe (v1.x)
-          # FIX: Reverting to MyGet feed, which lists the package
+          $cliPackageId = "UiPath.CLI" 
+          $cliPackageVersion = "23.4.1" 
+          # Using MyGet feed, which lists the package
           $uipathNugetSource = "https://www.myget.org/F/uipath/api/v3/index.json" 
 
           Write-Host "Creating CLI directory: $installPath"
@@ -68,8 +68,8 @@ jobs:
           Invoke-WebRequest -Uri $nugetExeUrl -OutFile $nugetExePath
 
           Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's MyGet NuGet feed"
-          # FIX: Added --verbosity Detailed for better debugging of NuGet issues
-          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source $uipathNugetSource -NonInteractive --verbosity Detailed
+          # FIX: Removed --verbosity Detailed as it's not supported by this nuget.exe version
+          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source $uipathNugetSource -NonInteractive 
 
           # The uipcli.exe will be inside a tools folder within the extracted NuGet package
           $extractedCliDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion\tools"
@@ -92,122 +92,5 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          # FIX: Corrected path to reflect UiPath.CLI package name and version
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.23.4.1\tools\uipcli.exe" 
-          
-          Write-Host "Listing contents of ${cliDir}:"
-          Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
-          
-          if (Test-Path $cliExePath) {
-              Write-Host "${cliExePath} exists!"
-              Write-Host "Running '${cliExePath} --version':"
-              & $cliExePath --version
-              Write-Host "Running '${cliExePath} --help':"
-              & $cliExePath --help
-          } else {
-              Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
-              exit 1
-          }
-
-      - name: Build Nuget Package
-        shell: pwsh
-        run: |
-          # This script uses the uipcli.exe located in the PATH
-          "${{ github.workspace }}\scripts\UiPathPack.ps1" `
-          -project_path "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\${{ env.PROJECT_NAME }}\project.json" `
-          -output_path "${{ github.workspace }}\package"
-
-      - name: Upload UiPath Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Artifacts
-          path: |
-            package/*.*
-            scripts/*.ps1
-
-  publish-uipath-nuget-package:
-    needs: build-uipath-nuget-package
-    runs-on: windows-latest
-    steps:
-      - name: Download UiPath Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: Artifacts
-      
-      - name: Manually Setup UiPath CLI
-        shell: pwsh
-        run: |
-          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli" 
-          $installPath = $cliDir 
-          
-          # --- NEW CLI INSTALLATION METHOD: Download UiPath.CLI from MyGet feed ---
-          $nugetExeUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
-          $nugetExePath = Join-Path $installPath "nuget.exe"
-          $cliPackageId = "UiPath.CLI" 
-          $cliPackageVersion = "23.4.1" 
-          # FIX: Reverting to MyGet feed (which lists the package)
-          $uipathNugetSource = "https://www.myget.org/F/uipath/api/v3/index.json" 
-
-          Write-Host "Creating CLI directory: $installPath"
-          New-Item -ItemType Directory -Path $installPath -Force | Out-Null
-
-          Write-Host "Downloading nuget.exe from $nugetExeUrl to $nugetExePath"
-          Invoke-WebRequest -Uri $nugetExeUrl -OutFile $nugetExePath
-
-          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's MyGet NuGet feed"
-          # FIX: Added --verbosity Detailed for better debugging of NuGet issues
-          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source $uipathNugetSource -NonInteractive --verbosity Detailed
-
-          # The uipcli.exe will be inside a tools folder within the extracted NuGet package
-          $extractedCliDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion\tools"
-          $cliExePath = Join-Path $extractedCliDir "uipcli.exe" 
-
-          Write-Host "Adding UiPath CLI tools directory to PATH: $extractedCliDir"
-          Add-Content -Path $env:GITHUB_PATH -Value $extractedCliDir
-
-      - name: Verify Extracted CLI Content and Commands (Publish Job - Diagnostic)
-        shell: pwsh
-        run: |
-          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.23.4.1\tools\uipcli.exe" # Correct path after NuGet extraction
-          
-          Write-Host "Listing contents of ${cliDir}:"
-          Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
-          
-          if (Test-Path $cliExePath) {
-              Write-Host "${cliExePath} exists!"
-              Write-Host "Running '${cliExePath} --version':"
-              & $cliExePath --version
-              Write-Host "Running '${cliExePath} --help':"
-              & $cliExePath --help
-          } else {
-              Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
-              exit 1
-          }
-
-      - name: Publish Nuget Package to DEV
-        shell: pwsh
-        run: |
-          # This script uses the uipcli.exe located in the PATH
-          "${{ github.workspace }}\scripts\UiPathDeploy.ps1" `
-          -packages_path "${{ github.workspace }}\package" `
-          -orchestrator_url "${{ env.ORCH_URL }}" `
-          -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
-          -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
-          -client_id "${{ env.ORCH_CLIENT_ID }}" `
-          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
-          -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}"
-
-  create-pull-request:
-    needs: publish-uipath-nuget-package
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: pull-request
-        uses: repo-sync/pull-request@v2
-        with:
-          destination_branch: "master"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_label: "feature, automated pr"
-          pr_title: "Pull Request From Github Action"
+          # Corrected path to reflect UiPath.CLI package name and version
+          $cliExePath = Join-Path $cliDir "UiPath.
