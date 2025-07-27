@@ -27,24 +27,23 @@ Write-Host "Packing UiPath project: $project_path"
 Write-Host "Output path: $output_path"
 
 # --- IMPORTANT CHANGE FOR UiPath CLI v2.0.44 ---
-# The command for packing is now 'uipath archive pack' or 'uipath app pack' depending on context.
-# For generic project packing, 'archive pack' is common.
+# The command for packing standard projects is typically 'uipath pack'.
+# 'archive' is a separate command, and 'project pack' syntax is older.
 
-Write-Host "Using UiPath CLI v2 syntax for 'archive pack'..."
+Write-Host "Using UiPath CLI v2 syntax for 'pack'..." # Updated message
 try {
     # Execute the UiPath CLI command for packing
-    # Check 'uipath.exe archive pack --help' for all options.
-    # Common options: -p (project path), -o (output path), --library (if it's a library)
-    & $cli_executable_name archive pack `
+    # Check 'uipath.exe pack --help' for all options.
+    # Common options: --project-path, --output, --version, --library (if it's a library)
+    & $cli_executable_name pack `
         --project-path "$project_path" `
         --output "$output_path" `
-        # Add --version for StudioX/Studio based projects if needed, e.g., --version "23.10"
-        # If it's a library project, you might need '--library' argument
-        # Example for a specific version: --version 23.10.8-preview (or other if required)
+        # Add --version if your project requires a specific Studio compatibility version, e.g., --version "23.10"
+        # Add --library if it's an automation library project
         # For simplicity, let's start with just project and output path.
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "UiPath CLI 'archive pack' command failed with exit code $LASTEXITCODE."
+        Write-Error "UiPath CLI 'pack' command failed with exit code $LASTEXITCODE." # Updated message
         exit 1
     }
     Write-Host "Successfully packed UiPath project."
