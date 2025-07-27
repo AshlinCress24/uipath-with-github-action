@@ -54,26 +54,19 @@ jobs:
           $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
           New-Item -ItemType Directory -Force -Path $installPath
           
-          # This URL downloads the latest Windows AMD64 version of UiPath CLI
           $downloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
-          
           Write-Host "Downloading UiPath CLI from $downloadUrl"
           Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
           
           Write-Host "Extracting UiPath CLI to $installPath"
           Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
           
-          # Add the extracted path to GITHUB_PATH environment file.
-          # This makes 'uipcli' available to all subsequent steps in this job.
-          Write-Host "Adding '$installPath' to GITHUB_PATH"
+          # We still add to GITHUB_PATH as a good practice, but the scripts will now use the full path
+          Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
       # MANUAL CLI SETUP END
 
-      - name: Verify UiPath CLI is available (Optional but Recommended)
-        shell: pwsh
-        run: |
-          # This step will confirm uipcli is now in the PATH for subsequent steps
-          uipcli --version
+      # The verify step is removed, as scripts will now use the full path directly
 
       - name: Build Nuget Package
         shell: pwsh
@@ -104,26 +97,18 @@ jobs:
           $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
           New-Item -ItemType Directory -Force -Path $installPath
           
-          # This URL downloads the latest Windows AMD64 version of UiPath CLI
           $downloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
-          
           Write-Host "Downloading UiPath CLI from $downloadUrl"
           Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
           
           Write-Host "Extracting UiPath CLI to $installPath"
           Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
           
-          # Add the extracted path to GITHUB_PATH environment file.
-          # This makes 'uipcli' available to all subsequent steps in this job.
-          Write-Host "Adding '$installPath' to GITHUB_PATH"
+          Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
       # MANUAL CLI SETUP END
 
-      - name: Verify UiPath CLI is available (Optional but Recommended)
-        shell: pwsh
-        run: |
-          # This step will confirm uipcli is now in the PATH for subsequent steps
-          uipcli --version
+      # The verify step is removed
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
