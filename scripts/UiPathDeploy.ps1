@@ -14,6 +14,11 @@ $cli_executable_name = $env:UIPATH_CLI_EXECUTABLE_NAME
 
 Write-Host "Starting UiPath Deploy Script (using $cli_executable_name)..."
 
+if ([string]::IsNullOrEmpty($cli_executable_name)) {
+    Write-Error "Environment variable UIPATH_CLI_EXECUTABLE_NAME is not set."
+    exit 1
+}
+
 $cli_path = Get-Command $cli_executable_name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
 if (-not $cli_path) {
     Write-Error "UiPath CLI executable '$cli_executable_name' not found in PATH for deployment."
@@ -22,7 +27,6 @@ if (-not $cli_path) {
 Write-Host "UiPath CLI Executable: $cli_path"
 
 try {
-    # 1. Login using OAuth client credentials
     Write-Host "Logging in to UiPath Orchestrator..."
     & $cli_executable_name auth login `
         --url "$orchestrator_url" `
@@ -43,14 +47,12 @@ try {
         exit 1
     }
 
-    # 3. Deploy the package
     $folder_arg = ""
     if (![string]::IsNullOrEmpty($folder_organization_unit)) {
         $folder_arg = "--folder-path `"$folder_organization_unit`""
     }
 
     Write-Host "Publishing package to Orchestrator..."
-    # Use CLI v2 syntax for publishing
     & $cli_executable_name package deploy `
         --path "$package_file" `
         $folder_arg
@@ -65,10 +67,10 @@ try {
     Write-Error ("Error deploying UiPath project: " + $_.Exception.Message)
     exit 1
 } finally {
-    Write-Host "Attempting to logout from UiPath Orchestrator..."
+    Write-Host "Logging out from UiPath Orchestrator..."
     & $cli_executable_name auth logout -Force
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "UiPath CLI logout command failed with exit code $LASTEXITCODE, but deployment process completed."
+        Write-Warning "Logout command failed but deployment completed."
     } else {
         Write-Host "Successfully logged out."
     }
