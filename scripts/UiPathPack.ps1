@@ -26,14 +26,16 @@ if (-not (Test-Path $output_path -PathType Container)) {
 Write-Host "Packing UiPath project: $project_path"
 Write-Host "Output path: $output_path"
 
-# --- CRITICAL CHANGE FOR UiPath CLI v2.x ---
-# The command for packing Studio projects is now 'uipath studio package pack'
-# The --source argument expects the project *folder*, not the project.json file itself.
-
 # Extract the project folder from the project_path
 $project_folder = Split-Path -Path $project_path -Parent
 
-Write-Host "Using UiPath CLI v2 syntax for 'studio package pack'..." # Updated message
+Write-Host "Using UiPath CLI v2 syntax for 'studio package pack'..."
+
+# --- NEW DIAGNOSTIC LINES START ---
+Write-Host "Checking contents of the project source folder: $project_folder"
+Get-ChildItem -Path "$project_folder" -Force | Format-Table -AutoSize # This will show what's actually there
+# --- NEW DIAGNOSTIC LINES END ---
+
 try {
     # Execute the UiPath CLI command for packing
     # Command: uipath studio package pack --source <project_folder> --destination <output_folder>
@@ -42,10 +44,9 @@ try {
         --destination "$output_path" `
         # Optional: Add --version if your project requires a specific Studio compatibility version, e.g., --version "23.10"
         # Optional: Add --library if it's an automation library project
-        # Example for a specific version: --version 23.10.8-preview (or other if required)
 
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "UiPath CLI 'studio package pack' command failed with exit code $LASTEXITCODE." # Updated message
+        Write-Error "UiPath CLI 'studio package pack' command failed with exit code $LASTEXITCODE."
         exit 1
     }
     Write-Host "Successfully packed UiPath project."
