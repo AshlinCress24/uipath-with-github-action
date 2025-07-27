@@ -1,31 +1,46 @@
 param(
     [Parameter(Mandatory=$true)]
     [string]$project_path,
+
     [Parameter(Mandatory=$true)]
     [string]$output_path
 )
 
-Write-Host "Starting UiPath Package Creation..."
+Write-Host "Starting UiPath Pack Script..."
 
-# Define the full path to uipcli.exe (note: no 'h' in uipcli for older versions)
-$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipcli.exe"
+# The UiPath CLI executable path after NuGet extraction
+# Make sure this path matches the version and structure from development.yml
+$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\UiPath.CLI.23.4.1\tools\uipcli.exe"
 
-# Ensure the output directory exists
+Write-Host "UiPath CLI Executable Path: $uipathCliExecutable"
+
+# Verify CLI existence
+if (-not (Test-Path $uipathCliExecutable)) {
+    Write-Error "UiPath CLI executable not found at $uipathCliExecutable. Exiting."
+    exit 1
+}
+
+# Ensure output directory exists
+Write-Host "Ensuring output directory exists: $output_path"
 if (-not (Test-Path $output_path)) {
-    Write-Host "Creating output directory: $output_path"
     New-Item -ItemType Directory -Path $output_path -Force | Out-Null
 }
 
 Write-Host "Packing UiPath project: $project_path"
+Write-Host "Output path: $output_path"
 
-# Use the older 'package pack' command syntax
-& $uipathCliExecutable package pack `
+# Execute uipcli.exe to pack the project
+# Use the full path to the executable
+$packResult = & $uipathCliExecutable package pack `
     --project-path "$project_path" `
-    --output "$output_path"
+    --output "$output_path" `
+    --serverless
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "UiPath CLI 'package pack' command failed with exit code $LASTEXITCODE"
-    exit 1
+    Write-Error "UiPath CLI 'package pack' command failed with exit code $LASTEXITCODE."
+    exit $LASTEXITCODE
+} else {
+    Write-Host "UiPath project packed successfully."
 }
 
-Write-Host "UiPath Package Creation Completed."
+Write-Host "Finished UiPath Pack Script."
