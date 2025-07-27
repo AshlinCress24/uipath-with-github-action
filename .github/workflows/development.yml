@@ -63,26 +63,28 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
       
-      # --- VERIFY STEP - CORRECTED EXECUTABLE NAME ---
-      - name: Verify Extracted CLI Content
+      - name: Verify Extracted CLI Content and Commands
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          $cliExePath = Join-Path $cliDir "uipath.exe" # Confirmed this is the correct executable name
+          
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
-          # Optional: Verify the file exists and is an executable
-          $cliExePath = Join-Path $cliDir "uipath.exe" # <-- CHANGED TO uipath.exe
           if (Test-Path $cliExePath) {
               Write-Host "${cliExePath} exists!"
-              # Attempt to run it directly with its full path for a test
-              Write-Host "Attempting to run ${cliExePath} --version directly:"
-              & $cliExePath --version
+              Write-Host "Running '${cliExePath} --version':"
+              & $cliExePath --version # Test version command
+              Write-Host "Running '${cliExePath} --help':"
+              & $cliExePath --help # Get main help output
+              Write-Host "Running '${cliExePath} package --help' (if 'package' command exists):"
+              # Try to get help for the 'package' command, if it exists
+              & $cliExePath package --help || Write-Warning "Command 'package' might not be available or syntax is different."
           } else {
-              Write-Error "${cliExePath} NOT FOUND!"
+              Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
           }
-      # --- END VERIFY STEP ---
 
       - name: Build Nuget Package
         shell: pwsh
@@ -122,24 +124,27 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
 
-      # --- VERIFY STEP (PUBLISH JOB) - CORRECTED EXECUTABLE NAME ---
-      - name: Verify Extracted CLI Content (Publish Job)
+      - name: Verify Extracted CLI Content and Commands (Publish Job)
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
+          $cliExePath = Join-Path $cliDir "uipath.exe"
+          
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
-          $cliExePath = Join-Path $cliDir "uipath.exe" # <-- CHANGED TO uipath.exe
           if (Test-Path $cliExePath) {
               Write-Host "${cliExePath} exists!"
-              Write-Host "Attempting to run ${cliExePath} --version directly:"
+              Write-Host "Running '${cliExePath} --version':"
               & $cliExePath --version
+              Write-Host "Running '${cliExePath} --help':"
+              & $cliExePath --help
+              Write-Host "Running '${cliExePath} package --help' (if 'package' command exists):"
+              & $cliExePath package --help || Write-Warning "Command 'package' might not be available or syntax is different."
           } else {
-              Write-Error "${cliExePath} NOT FOUND!"
+              Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
           }
-      # --- END VERIFY STEP ---
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
