@@ -53,12 +53,12 @@ jobs:
           $cliDir = "${{ github.workspace }}\uipathcli"
           $installPath = $cliDir
           
-          # --- NEW CLI INSTALLATION METHOD: Download via NuGet ---
+          # --- NEW CLI INSTALLATION METHOD: Download UiPath.CLI (not .Windows) from official feed ---
           $nugetExeUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
           $nugetExePath = Join-Path $installPath "nuget.exe"
-          $cliPackageId = "UiPath.CLI.Windows"
-          $cliPackageVersion = "2023.4.1" # Corresponding to a stable v1.x CLI
-          # $nugetPackagePath = Join-Path $installPath "$($cliPackageId).$($cliPackageVersion).nupkg" # This variable is no longer strictly needed
+          $cliPackageId = "UiPath.CLI" # FIX: Changed to UiPath.CLI (without .Windows)
+          $cliPackageVersion = "23.4.1" # FIX: Confirmed version on official feed that should have v1.x CLI
+          $uipathNugetSource = "https://pkgs.dev.azure.com/uipath/Public/_packaging/UiPath-Official/nuget/v3/index.json" # FIX: Official UiPath NuGet feed
 
           Write-Host "Creating CLI directory: $installPath"
           New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -66,9 +66,8 @@ jobs:
           Write-Host "Downloading nuget.exe from $nugetExeUrl to $nugetExePath"
           Invoke-WebRequest -Uri $nugetExeUrl -OutFile $nugetExePath
 
-          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's NuGet feed"
-          # FIX: Changed NuGet source to UiPath's official feed
-          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source "https://www.myget.org/F/uipath/api/v3/index.json" -NonInteractive
+          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's Official NuGet feed"
+          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source $uipathNugetSource -NonInteractive
 
           # The uipcli.exe will be inside a tools folder within the extracted NuGet package
           $extractedCliDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion\tools"
@@ -91,8 +90,8 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          # The actual executable is in the 'tools' subfolder after NuGet extraction
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.Windows.2023.4.1\tools\uipcli.exe" # Correct path after NuGet extraction
+          # FIX: Corrected path to reflect UiPath.CLI package name and version
+          $cliExePath = Join-Path $cliDir "UiPath.CLI.23.4.1\tools\uipcli.exe" 
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
@@ -136,15 +135,15 @@ jobs:
       - name: Manually Setup UiPath CLI
         shell: pwsh
         run: |
-          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli" # Changed to $cliDir for consistency
-          $installPath = $cliDir # Use $cliDir as the base for installation
+          $cliDir = "$env:GITHUB_WORKSPACE\uipathcli" 
+          $installPath = $cliDir 
           
-          # --- NEW CLI INSTALLATION METHOD: Download via NuGet ---
+          # --- NEW CLI INSTALLATION METHOD: Download UiPath.CLI (not .Windows) from official feed ---
           $nugetExeUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
           $nugetExePath = Join-Path $installPath "nuget.exe"
-          $cliPackageId = "UiPath.CLI.Windows"
-          $cliPackageVersion = "2023.4.1" # Corresponding to a stable v1.x CLI
-          # $nugetPackagePath = Join-Path $installPath "$($cliPackageId).$($cliPackageVersion).nupkg" # This variable is no longer strictly needed
+          $cliPackageId = "UiPath.CLI" # FIX: Changed to UiPath.CLI (without .Windows)
+          $cliPackageVersion = "23.4.1" # FIX: Confirmed version on official feed that should have v1.x CLI
+          $uipathNugetSource = "https://pkgs.dev.azure.com/uipath/Public/_packaging/UiPath-Official/nuget/v3/index.json" # FIX: Official UiPath NuGet feed
 
           Write-Host "Creating CLI directory: $installPath"
           New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -152,13 +151,12 @@ jobs:
           Write-Host "Downloading nuget.exe from $nugetExeUrl to $nugetExePath"
           Invoke-WebRequest -Uri $nugetExeUrl -OutFile $nugetExePath
 
-          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's NuGet feed"
-          # FIX: Changed NuGet source to UiPath's official feed
-          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source "https://www.myget.org/F/uipath/api/v3/index.json" -NonInteractive
+          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's Official NuGet feed"
+          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source $uipathNugetSource -NonInteractive
 
           # The uipcli.exe will be inside a tools folder within the extracted NuGet package
           $extractedCliDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion\tools"
-          $cliExePath = Join-Path $extractedCliDir "uipcli.exe" # Correctly refers to uipcli.exe
+          $cliExePath = Join-Path $extractedCliDir "uipcli.exe" 
 
           Write-Host "Adding UiPath CLI tools directory to PATH: $extractedCliDir"
           Add-Content -Path $env:GITHUB_PATH -Value $extractedCliDir
@@ -167,7 +165,7 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.Windows.2023.4.1\tools\uipcli.exe" # Correct path after NuGet extraction
+          $cliExePath = Join-Path $cliDir "UiPath.CLI.23.4.1\tools\uipcli.exe" # FIX: Correct path after NuGet extraction
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
