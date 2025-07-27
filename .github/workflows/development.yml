@@ -16,22 +16,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install PowerShell (Ensure pwsh available)
-        uses: actions/setup-powershell@v2
+      - name: Set up PowerShell Core
+        uses: actions/setup-pwsh@v2
 
       - name: Download UiPath CLI
         shell: pwsh
         run: |
           $Workspace = "${{ github.workspace }}"
-          pwsh scripts/DownloadUiPathCli.ps1 -WorkspacePath $Workspace
+          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath $Workspace
 
       - name: Pack UiPath Project
         shell: pwsh
         run: |
-          pwsh scripts/UiPathPack.ps1 `
+          pwsh ./scripts/UiPathPack.ps1 `
             -project_path "${{ github.workspace }}/project.json" `
             -output_path "${{ github.workspace }}/output_packages"
-        # optionally set env vars for cli location if needed (from DownloadUiPathCli.ps1)
 
       - name: Upload UiPath Package as Artifact
         uses: actions/upload-artifact@v4
@@ -47,11 +46,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up PowerShell Core
+        uses: actions/setup-pwsh@v2
+
       - name: Download UiPath CLI
         shell: pwsh
         run: |
           $Workspace = "${{ github.workspace }}"
-          pwsh scripts/DownloadUiPathCli.ps1 -WorkspacePath $Workspace
+          pwsh ./scripts/DownloadUiPathCli.ps1 -WorkspacePath $Workspace
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
@@ -62,18 +64,11 @@ jobs:
       - name: Deploy UiPath Package to Orchestrator
         shell: pwsh
         env:
-          # Pass secrets from GitHub
           ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
           ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
           ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
           ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
           ORCH_URL: ${{ secrets.ORCH_URL }}
         run: |
-          pwsh scripts/UiPathDeploy.ps1 `
+          pwsh ./scripts/UiPathDeploy.ps1 `
             -packages_path "${{ github.workspace }}/downloaded_packages" `
-            -orchestrator_url "$env:ORCH_URL" `
-            -organization_name "$env:ORCH_ORGANIZATION_NAME" `
-            -orchestrator_tenant "$env:ORCH_TENANT" `
-            -client_id "$env:ORCH_CLIENT_ID" `
-            -client_secret "$env:ORCH_CLIENT_SECRET" `
-            -folder_organization_unit ""                  # Supply a valid folder path if needed
