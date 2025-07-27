@@ -16,8 +16,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Manual fallback: download and extract UiPath CLI from official GitHub releases
-      - name: Download and Extract UiPath CLI Manually (Fallback)
+      # Manually download and extract UiPath CLI from official releases
+      - name: Download and Extract UiPath CLI Manually
         shell: pwsh
         run: |
           $cliZip = "uipathcli.zip"
@@ -25,11 +25,11 @@ jobs:
           Invoke-WebRequest $cliUrl -OutFile $cliZip
           Expand-Archive -Force -Path $cliZip -DestinationPath "./uipathcli"
           Remove-Item $cliZip
-          # Add extracted CLI folder to PATH for subsequent steps
+          # Add extracted CLI folder to PATH environment variable
           echo "##vso[task.prependpath]$(Resolve-Path ./uipathcli)"
           Write-Host "Added extracted UiPath CLI folder to PATH."
 
-      # Verify CLI availability
+      # Verify that uipathcli is available after extraction
       - name: Check UiPath CLI availability
         shell: pwsh
         run: |
@@ -41,14 +41,14 @@ jobs:
             Write-Host "'uipathcli' found at: $($cliCmd.Path)"
           }
 
-      # Pack UiPath Project
+      # Pack UiPath project using your script
       - name: Pack UiPath Project
         shell: pwsh
         run: pwsh ./scripts/UiPathPack.ps1 `
           -project_path "${{ github.workspace }}/project.json" `
           -output_path "${{ github.workspace }}/output_packages"
 
-      # Upload package artifact
+      # Upload the packed project artifact
       - name: Upload UiPath Package Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -63,8 +63,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Manual fallback again in deploy job
-      - name: Download and Extract UiPath CLI Manually (Fallback)
+      # Manual download and extraction of UiPath CLI again in deploy job
+      - name: Download and Extract UiPath CLI Manually
         shell: pwsh
         run: |
           $cliZip = "uipathcli.zip"
@@ -75,7 +75,7 @@ jobs:
           echo "##vso[task.prependpath]$(Resolve-Path ./uipathcli)"
           Write-Host "Added extracted UiPath CLI folder to PATH."
 
-      # Verify CLI availability on deploy job too
+      # Verify CLI presence again in deploy job
       - name: Check UiPath CLI availability
         shell: pwsh
         run: |
@@ -87,14 +87,14 @@ jobs:
             Write-Host "'uipathcli' found at: $($cliCmd.Path)"
           }
 
-      # Download package artifact
+      # Download the packaged artifact from build job
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
         with:
           name: uipath-package
           path: ${{ github.workspace }}/downloaded_packages
 
-      # Deploy package to Orchestrator
+      # Deploy package to UiPath Orchestrator
       - name: Deploy UiPath Package to Orchestrator
         shell: pwsh
         env:
