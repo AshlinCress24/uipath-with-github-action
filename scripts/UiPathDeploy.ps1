@@ -17,10 +17,8 @@ param(
 
 Write-Host "Starting UiPath Package Deployment..."
 
-# Define the full path to uipcli.exe based on the GitHub Actions workspace
-# NOTE: The PATH from the GITHUB_PATH step is not reliably picked up by the *same* job's PowerShell scripts.
-# So, we explicitly reference the exe here.
-$uipcliPath = "$env:GITHUB_WORKSPACE\uipathcli\uipcli.exe"
+# Define the full path to uipath.exe (CORRECTED NAME)
+$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipath.exe" # <-- CHANGED TO uipath.exe
 
 # Get the latest .nupkg file in the packages_path
 $nupkgFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -34,8 +32,8 @@ $nupkgFullPath = $nupkgFile.FullName
 Write-Host "Found package: $nupkgFullPath"
 
 Write-Host "Authenticating to Orchestrator..."
-# Execute the uipcli auth command using the full path
-& $uipcliPath auth client-credentials `
+# Execute the uipath.exe auth command using the full path
+& $uipathCliExecutable auth client-credentials `
     --url "$orchestrator_url" `
     --organization-name "$organization_name" `
     --tenant "$orchestrator_tenant" `
@@ -48,8 +46,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Publishing package to Orchestrator folder: $folder_organization_unit"
-# Execute the uipcli orchestrator publish command using the full path
-& $uipcliPath orchestrator publish `
+# Execute the uipath.exe orchestrator publish command using the full path
+& $uipathCliExecutable orchestrator publish `
     --file "$nupkgFullPath" `
     --folder-path "$folder_organization_unit"
 
