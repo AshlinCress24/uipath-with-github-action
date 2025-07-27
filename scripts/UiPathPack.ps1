@@ -1,5 +1,3 @@
-# scripts/UiPathPack.ps1
-
 param(
     [string]$project_path,
     [string]$output_path
