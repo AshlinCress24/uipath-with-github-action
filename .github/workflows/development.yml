@@ -93,21 +93,7 @@ jobs:
           Write-Host "Setting UIPATH_CLI_EXECUTABLE_NAME environment variable..."
           $env:UIPATH_CLI_EXECUTABLE_NAME = "uipath.exe"
 
-      - name: Download UiPath Package Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: uipath-package
-          path: ${{ github.workspace }}/downloaded_packages
-
-      - name: Deploy UiPath Package to Orchestrator
-        shell: pwsh
-        env:
-          ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
-          ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
-          ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
-          ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
-          ORCH_URL: ${{ secrets.ORCH_URL }}
-        run: |
+          Write-Host "Running UiPath Deploy Script..."
           pwsh ./scripts/UiPathDeploy.ps1 `
             -packages_path "$workspace/downloaded_packages" `
             -orchestrator_url "$env:ORCH_URL" `
