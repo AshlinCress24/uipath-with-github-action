@@ -58,7 +58,7 @@ jobs:
           $nugetExePath = Join-Path $installPath "nuget.exe"
           $cliPackageId = "UiPath.CLI.Windows"
           $cliPackageVersion = "2023.4.1" # Corresponding to a stable v1.x CLI
-          $nugetPackagePath = Join-Path $installPath "$($cliPackageId).$($cliPackageVersion).nupkg"
+          # $nugetPackagePath = Join-Path $installPath "$($cliPackageId).$($cliPackageVersion).nupkg" # This variable is no longer strictly needed
 
           Write-Host "Creating CLI directory: $installPath"
           New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -66,8 +66,9 @@ jobs:
           Write-Host "Downloading nuget.exe from $nugetExeUrl to $nugetExePath"
           Invoke-WebRequest -Uri $nugetExeUrl -OutFile $nugetExePath
 
-          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion"
-          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source "https://api.nuget.org/v3/index.json" -NonInteractive
+          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's NuGet feed"
+          # FIX: Changed NuGet source to UiPath's official feed
+          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source "https://www.myget.org/F/uipath/api/v3/index.json" -NonInteractive
 
           # The uipcli.exe will be inside a tools folder within the extracted NuGet package
           $extractedCliDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion\tools"
@@ -91,7 +92,7 @@ jobs:
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
           # The actual executable is in the 'tools' subfolder after NuGet extraction
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.Windows.2023.4.1\tools\uipcli.exe" # FIX: Correct path after NuGet extraction
+          $cliExePath = Join-Path $cliDir "UiPath.CLI.Windows.2023.4.1\tools\uipcli.exe" # Correct path after NuGet extraction
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
@@ -143,7 +144,7 @@ jobs:
           $nugetExePath = Join-Path $installPath "nuget.exe"
           $cliPackageId = "UiPath.CLI.Windows"
           $cliPackageVersion = "2023.4.1" # Corresponding to a stable v1.x CLI
-          $nugetPackagePath = Join-Path $installPath "$($cliPackageId).$($cliPackageVersion).nupkg"
+          # $nugetPackagePath = Join-Path $installPath "$($cliPackageId).$($cliPackageVersion).nupkg" # This variable is no longer strictly needed
 
           Write-Host "Creating CLI directory: $installPath"
           New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -151,8 +152,9 @@ jobs:
           Write-Host "Downloading nuget.exe from $nugetExeUrl to $nugetExePath"
           Invoke-WebRequest -Uri $nugetExeUrl -OutFile $nugetExePath
 
-          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion"
-          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source "https://api.nuget.org/v3/index.json" -NonInteractive
+          Write-Host "Downloading UiPath CLI package '$cliPackageId' v$cliPackageVersion from UiPath's NuGet feed"
+          # FIX: Changed NuGet source to UiPath's official feed
+          & $nugetExePath install $cliPackageId -Version $cliPackageVersion -OutputDirectory $installPath -Source "https://www.myget.org/F/uipath/api/v3/index.json" -NonInteractive
 
           # The uipcli.exe will be inside a tools folder within the extracted NuGet package
           $extractedCliDir = Join-Path $installPath "$cliPackageId.$cliPackageVersion\tools"
@@ -165,7 +167,7 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "UiPath.CLI.Windows.2023.4.1\tools\uipcli.exe" # FIX: Correct path after NuGet extraction
+          $cliExePath = Join-Path $cliDir "UiPath.CLI.Windows.2023.4.1\tools\uipcli.exe" # Correct path after NuGet extraction
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
