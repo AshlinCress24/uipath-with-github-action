@@ -47,8 +47,29 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v2
 
-      - name: Setup UiPath CLI
-        uses: UiPath/setup-uipath-cli@v2
+      # MANUAL CLI SETUP START - Replacing uses: UiPath/setup-uipath-cli@v2
+      - name: Manually Setup UiPath CLI
+        shell: pwsh
+        run: |
+          $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
+          New-Item -ItemType Directory -Force -Path $installPath
+          
+          # This URL downloads the latest Windows AMD64 version of UiPath CLI
+          $downloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+          
+          Write-Host "Downloading UiPath CLI from $downloadUrl"
+          Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
+          
+          Write-Host "Extracting UiPath CLI to $installPath"
+          Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
+          
+          # Add the CLI's directory to the PATH for the current job session
+          $env:Path += ";$installPath"
+          Write-Host "UiPath CLI installed to $installPath and added to PATH."
+          
+          # Verify installation (optional, but good for debugging)
+          uipcli --version
+      # MANUAL CLI SETUP END
 
       - name: Build Nuget Package
         shell: pwsh
@@ -56,7 +77,7 @@ jobs:
           ${{ github.workspace }}\scripts\UiPathPack.ps1 ${{ github.workspace }}\project.json -destination_folder ${{ github.workspace }}\package
 
       - name: Upload UiPath Artifacts
-        uses: actions/upload-artifact@v4 # <--- UPDATED TO V4
+        uses: actions/upload-artifact@v4
         with:
           name: Artifacts
           path: |
@@ -68,18 +89,33 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Download UiPath Artifacts
-        # Note: actions/download-artifact also has a v4. If you update upload to v4,
-        # you *must* update download to v4 as well for the same artifact to be compatible.
-        # However, you are uploading artifacts in one job and downloading in the *next* job of the *same workflow*.
-        # For this specific case, actions/download-artifact@v2 might still work with artifacts uploaded by v4,
-        # but it's generally best practice to keep them consistent if possible, especially when transferring
-        # artifacts between different workflows/runs. If you encounter download issues, update this too.
         uses: actions/download-artifact@v2 
         with:
           name: Artifacts
       
-      - name: Setup UiPath CLI
-        uses: UiPath/setup-uipath-cli@v2
+      # MANUAL CLI SETUP START - Replacing uses: UiPath/setup-uipath-cli@v2
+      - name: Manually Setup UiPath CLI
+        shell: pwsh
+        run: |
+          $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
+          New-Item -ItemType Directory -Force -Path $installPath
+          
+          # This URL downloads the latest Windows AMD64 version of UiPath CLI
+          $downloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+          
+          Write-Host "Downloading UiPath CLI from $downloadUrl"
+          Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
+          
+          Write-Host "Extracting UiPath CLI to $installPath"
+          Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
+          
+          # Add the CLI's directory to the PATH for the current job session
+          $env:Path += ";$installPath"
+          Write-Host "UiPath CLI installed to $installPath and added to PATH."
+          
+          # Verify installation (optional, but good for debugging)
+          uipcli --version
+      # MANUAL CLI SETUP END
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
@@ -90,7 +126,7 @@ jobs:
           -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
           -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
           -client_id "${{ env.ORCH_CLIENT_ID }}" `
-          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" ` # Corrected this in the previous step
+          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
           -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}"
 
   create-pull-request:
