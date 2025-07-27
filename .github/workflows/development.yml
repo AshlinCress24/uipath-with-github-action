@@ -1,52 +1,108 @@
-name: Development CI/CD
+name: Development workflow
 
 on:
   push:
     branches:
-      - develop # This workflow runs when code is pushed to the 'develop' branch
+      - develop
 
+# Here the environment variables are declared in workflow level
 env:
-  PROJECT_NAME: Addition_of_2_Numbers                       
-  PROJECT_FOLDER: .
-  ORCH_URL: https://cloud.uipath.com/noviggptduln/DefaultTenant
+  PROJECT_NAME: Addition_of_2_Numbers # <--- IMPORTANT: Change this to the exact name of your UiPath project
+  PROJECT_FOLDER: . # Adjust if your project.json is in a subfolder relative to the repo root
+  ORCH_URL: https://cloud.uipath.com
   ORCH_TENANT: ${{ secrets.ORCH_TENANT }}
   ORCH_CLIENT_ID: ${{ secrets.ORCH_CLIENT_ID }}
   ORCH_CLIENT_SECRET: ${{ secrets.ORCH_CLIENT_SECRET }}
-  ORCH_DEV_FOLDER_PATH: Shared
+  ORCH_DEV_FOLDER_PATH: Shared # <--- IMPORTANT: Change this if your Development Orchestrator Folder is NOT "Shared"
+  ORCH_ORGANIZATION_NAME: ${{ secrets.ORCH_ORGANIZATION_NAME }}
 
 jobs:
-  # Job to build the Nuget package and publish it to Orchestrator
-  build-and-publish:
-    runs-on: windows-latest # Windows runners are recommended for UiPath automation
-
+  print-details:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout Your Repository Code
-        # Clones your own repository (containing your UiPath project code)
-        uses: actions/checkout@v4
+      - name: echo-default-env-variables
+        run: |
+          echo "Home: ${HOME}"
+          echo "GITHUB_WORKFLOW: ${GITHUB_WORKFLOW}"
+          echo "GITHUB_ACTIONS: ${GITHUB_ACTIONS}"
+          echo "GITHUB_ACTOR: ${GITHUB_ACTOR}"
+          echo "GITHUB_REPOSITORY: ${GITHUB_REPOSITORY}"
+          echo "GITHUB_EVENT_NAME: ${GITHUB_EVENT_NAME}"
+          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE}"
+          echo "GITHUB_SHA: ${GITHUB_SHA}"
+          echo "GITHUB_REF: ${GITHUB_REF}"
 
-      - name: Build UiPath NuGet Package
-        # IMPORTANT: Changed action version to @v2
-        uses: uipath/actions/pack-project-to-nuget-package@v2
-        with:
-          project-path: ${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\project.json # Path to your project.json
-          output-path: ${{ github.workspace }}\package # Folder where the .nupkg will be created
-          package-version: auto # Automatically increments package version
+  cleaner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner workspace path
+        run: |
+          echo "Cleaning up previous run"
+          rm -rf "${{ github.workspace }}"
 
-      - name: Upload UiPath Artifact (NuGet package)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.PROJECT_NAME }}.nupkg
-          path: "${{ github.workspace }}/package/${{ env.PROJECT_NAME }}.*.nupkg" # Path to the generated package
+  build-uipath-nuget-package:
+    needs: cleaner
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
 
-      - name: Deploy Nuget Package to Orchestrator Development Folder
-        # IMPORTANT: Changed action version to @v2
-        uses: uipath/actions/deploy-package-to-orchestrator@v2
+      - name: Setup UiPath CLI
+        uses: UiPath/setup-uipath-cli@v1 # Use the latest version
+
+      - name: Build Nuget Package
+        shell: pwsh
+        run: |
+          # The UiPathPack.ps1 script expects project.json path and destination folder
+          # Assuming project.json is at the root or within the specified PROJECT_FOLDER
+          # And 'package' folder will be created inside GITHUB_WORKSPACE
+          ${{ github.workspace }}\scripts\UiPathPack.ps1 ${{ github.workspace }}\project.json -destination_folder ${{ github.workspace }}\package
+
+      - name: Upload UiPath Artifacts
+        uses: actions/upload-artifact@v2
         with:
-          orchestrator-url: ${{ env.ORCH_URL }}
-          tenant-name: ${{ env.ORCH_TENANT }}
-          client-id: ${{ secrets.ORCH_CLIENT_ID }} # Using GitHub Secret
-          client-secret: ${{ secrets.ORCH_CLIENT_SECRET }} # Using GitHub Secret
-          orchestrator-folder-path: ${{ env.ORCH_DEV_FOLDER_PATH }} # Orchestrator folder for deployment
-          package-path: ${{ github.workspace }}\package # Folder where the .nupkg is located
-          process-name: ${{ env.PROJECT_NAME }} # Name of the process to update/create (usually same as project name)
-          # Optional: process-type: Attended / Unattended (default is Unattended)
+          name: Artifacts
+          path: |
+            package/*.* # This should include your .nupkg file
+            scripts/*.ps1 # Include scripts for subsequent steps
+
+  publish-uipath-nuget-package:
+    needs: build-uipath-nuget-package
+    runs-on: windows-latest
+    steps:
+      - name: Download UiPath Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: Artifacts
+      
+      - name: Setup UiPath CLI
+        uses: UiPath/setup-uipath-cli@v1 # Ensure CLI is available for the PowerShell script
+
+      - name: Publish Nuget Package to DEV
+        shell: pwsh
+        run: |
+          # Ensure your UiPathDeploy.ps1 expects these parameter names
+          ${{ github.workspace }}\scripts\UiPathDeploy.ps1 `
+          -packages_path "${{ github.workspace }}\package" ` # Pass the folder containing the .nupkg
+          -orchestrator_url "${{ env.ORCH_URL }}" `
+          -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
+          -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
+          -client_id "${{ env.ORCH_CLIENT_ID }}" `
+          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
+          -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}"
+
+  # Create Pull Request for Merge & Review
+  create-pull-request:
+    # This job must now depend on 'publish-uipath-nuget-package'
+    needs: publish-uipath-nuget-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: pull-request
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: "master" # Adjust if your main branch is named something else (e.g., "main")
+          github_token: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is usually auto-generated with sufficient permissions
+          pr_label: "feature, automated pr"
+          pr_title: "Pull Request From Github Action"
