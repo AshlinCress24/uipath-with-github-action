@@ -1,50 +1,62 @@
-param([string]$WorkspacePath)
+param(
+    [string]$WorkspacePath
+)
 
-$packageId = "uipath.cli" # all lowercase mandatory for NuGet URLs
-$packageDownloadPath = Join-Path $WorkspacePath "UiPathCliNuGet"
+# Official URL for latest UiPath CLI Windows x64 ZIP release (GitHub Releases)
+$cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
 
-if (Test-Path $packageDownloadPath) {
-    Remove-Item -Path $packageDownloadPath -Recurse -Force
-}
+$cliFileName = "uipathcli-windows-amd64.zip"
+$cliDirName = "uipathcli_" + (Get-Random -Maximum 99999)
+$cliDir = Join-Path $WorkspacePath $cliDirName
+$zipFilePath = Join-Path $WorkspacePath $cliFileName
 
-New-Item -Path $packageDownloadPath -ItemType Directory | Out-Null
-
-Write-Host "Downloading UiPath CLI NuGet package..."
-
-$nugetIndexUrl = "https://api.nuget.org/v3-flatcontainer/$packageId/index.json"
+Write-Host "Starting UiPath CLI download and setup from: $cliDownloadUrl"
+Write-Host "Target CLI directory: $cliDir"
 
 try {
-    $versionsJson = Invoke-RestMethod -Uri $nugetIndexUrl -UseBasicParsing
+    # Clean up any existing directory
+    if (Test-Path $cliDir -PathType Container) {
+        Remove-Item -Path $cliDir -Recurse -Force -ErrorAction Stop
+        Write-Host "Removed existing CLI directory: $cliDir"
+    }
+    New-Item -ItemType Directory -Path $cliDir -Force | Out-Null
 
-    $latestVersion = $versionsJson.versions[-1]
-    Write-Host "Latest UiPath CLI version: $latestVersion"
+    # Download the UiPath CLI ZIP
+    Write-Host "Downloading UiPath CLI zip..."
+    Invoke-WebRequest -Uri $cliDownloadUrl -OutFile $zipFilePath -UseBasicParsing -ErrorAction Stop -Verbose
+    Write-Host "Download completed: $zipFilePath"
 
-    $nupkgUrl = "https://api.nuget.org/v3-flatcontainer/$packageId/$latestVersion/$packageId.$latestVersion.nupkg"
-    Write-Host "Downloading nupkg from: $nupkgUrl"
+    # Extract the ZIP
+    Write-Host "Extracting UiPath CLI..."
+    Expand-Archive -Path $zipFilePath -DestinationPath $cliDir -Force -ErrorAction Stop
+    Write-Host "Extraction completed into $cliDir"
 
-    $nupkgPath = Join-Path $packageDownloadPath "$packageId.$latestVersion.nupkg"
-    Invoke-WebRequest -Uri $nupkgUrl -OutFile $nupkgPath -UseBasicParsing
+    # Look for the UiPath CLI executable - expected to be named 'uipathcli.exe'
+    $cliExePath = Get-ChildItem -Path $cliDir -Filter "uipathcli.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
 
-    Write-Host "Extracting NuGet package..."
-    Expand-Archive -Path $nupkgPath -DestinationPath $packageDownloadPath -Force
-
-    $exePath = Get-ChildItem -Path $packageDownloadPath -Recurse -Filter "uipathcli.exe" | Select-Object -First 1
-    if (-not $exePath) {
-        Write-Error "uipathcli.exe not found in extracted NuGet package."
+    if (-not $cliExePath) {
+        Write-Error "Could not find 'uipathcli.exe' in extracted files."
         exit 1
     }
 
-    Write-Host "Found UiPath CLI executable at: $($exePath.FullName)"
+    $cliExecutablePath = $cliExePath.DirectoryName
+    $cliFullPath = $cliExePath.FullName
+    Write-Host "Found CLI executable at: $cliFullPath"
 
-    $env:Path = "$($exePath.DirectoryName);$env:Path"
+    # Add CLI directory to PATH environment variable for current session
+    $env:Path = "$cliExecutablePath;$env:Path"
 
+    # Export environment variables for subsequent GitHub Actions steps
+    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_FULL_PATH=$cliFullPath"
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=uipathcli.exe"
-    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_FULL_PATH=$($exePath.FullName)"
-    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_DIR=$($exePath.DirectoryName)"
+    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_DIR=$cliExecutablePath"
 
-    Write-Host "UiPath CLI successfully downloaded and setup."
+    # Clean up ZIP file
+    Remove-Item -Path $zipFilePath -Force -ErrorAction SilentlyContinue
+
+    Write-Host "UiPath CLI setup completed successfully."
 
 } catch {
-    Write-Error "Failed to download or setup UiPath CLI via NuGet: $_"
+    Write-Error ("Failed to download or setup UiPath CLI: " + $_.Exception.Message)
     exit 1
 }
