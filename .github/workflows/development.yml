@@ -54,31 +54,33 @@ jobs:
           $cliZipPath = "${{ github.workspace }}\UiPathStudioCli.zip"
           $cliExtractDir = "${{ github.workspace }}\uipathcli"
           $cliExePath = Join-Path $cliExtractDir "uipath.cli.exe" # This is the expected executable name inside the zip
-
+          
           Write-Host "Creating CLI extraction directory: $cliExtractDir"
           New-Item -ItemType Directory -Path $cliExtractDir -Force | Out-Null
-
+          
           Write-Host "Attempting to download UiPath CLI from: $cliDownloadUrl"
           try {
               Invoke-WebRequest -Uri $cliDownloadUrl -OutFile $cliZipPath -UseBasicParsing -TimeoutSec 300
               Write-Host "Successfully downloaded UiPath CLI to $cliZipPath"
           } catch {
-              Write-Error "Failed to download UiPath CLI from $cliDownloadUrl: $($_.Exception.Message)"
+              # Corrected syntax for error message interpolation
+              Write-Error "Failed to download UiPath CLI from $cliDownloadUrl: $(${$_.Exception.Message})"
               exit 1
           }
-
+          
           Write-Host "Extracting UiPath CLI to: $cliExtractDir"
           try {
               Expand-Archive -Path $cliZipPath -DestinationPath $cliExtractDir -Force
               Write-Host "Successfully extracted UiPath CLI to $cliExtractDir"
           } catch {
-              Write-Error "Failed to extract UiPath CLI from $cliZipPath: $($_.Exception.Message)"
+              # Corrected syntax for error message interpolation
+              Write-Error "Failed to extract UiPath CLI from $cliZipPath: $(${$_.Exception.Message})"
               exit 1
           }
-
+          
           Write-Host "Adding UiPath CLI directory to PATH: $cliExtractDir"
           Add-Content -Path $env:GITHUB_PATH -Value $cliExtractDir
-
+          
           Write-Host "Verifying uipath.cli.exe presence and version..."
           if (Test-Path $cliExePath) {
               Write-Host "uipath.cli.exe found at: $cliExePath"
@@ -99,7 +101,7 @@ jobs:
           "${{ github.workspace }}\scripts\UiPathPack.ps1" `
           -project_path "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\${{ env.PROJECT_NAME }}\project.json" `
           -output_path "${{ github.workspace }}\package" `
-          -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}" # Still use correct YAML syntax for env var
+          -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}"
 
       - name: Upload UiPath Artifacts
         uses: actions/upload-artifact@v4
@@ -134,11 +136,60 @@ jobs:
               Invoke-WebRequest -Uri $cliDownloadUrl -OutFile $cliZipPath -UseBasicParsing -TimeoutSec 300
               Write-Host "Successfully downloaded UiPath CLI to $cliZipPath"
           } catch {
-              Write-Error "Failed to download UiPath CLI from $cliDownloadUrl: $($_.Exception.Message)"
+              # Corrected syntax for error message interpolation
+              Write-Error "Failed to download UiPath CLI from $cliDownloadUrl: $(${$_.Exception.Message})"
               exit 1
           }
 
           Write-Host "Extracting UiPath CLI to: $cliExtractDir"
           try {
               Expand-Archive -Path $cliZipPath -DestinationPath $cliExtractDir -Force
-              Write-Host "Successfully extracted UiPath CLI to $cliExtractDir
+              Write-Host "Successfully extracted UiPath CLI to $cliExtractDir"
+          } catch {
+              # Corrected syntax for error message interpolation
+              Write-Error "Failed to extract UiPath CLI from $cliZipPath: $(${$_.Exception.Message})"
+              exit 1
+          }
+
+          Write-Host "Adding UiPath CLI directory to PATH: $cliExtractDir"
+          Add-Content -Path $env:GITHUB_PATH -Value $cliExtractDir
+
+          Write-Host "Verifying uipath.cli.exe presence and version..."
+          if (Test-Path $cliExePath) {
+              Write-Host "uipath.cli.exe found at: $cliExePath"
+              & $cliExePath --version
+              & $cliExePath help
+          } else {
+              Write-Error "uipath.cli.exe not found after extraction! Expected at: $cliExePath"
+              Write-Host "Listing contents of $cliExtractDir:"
+              Get-ChildItem -Path $cliExtractDir -Recurse -Force | Format-Table -AutoSize
+              exit 1
+          }
+          echo "UIPATH_CLI_EXECUTABLE_NAME=uipath.cli.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Publish Nuget Package to DEV
+        shell: pwsh
+        run: |
+          "${{ github.workspace }}\scripts\UiPathDeploy.ps1" `
+          -packages_path "${{ github.workspace }}\package" `
+          -orchestrator_url "${{ env.ORCH_URL }}" `
+          -organization_name "${{ env.ORCH_ORGANIZATION_NAME }}" `
+          -orchestrator_tenant "${{ env.ORCH_TENANT }}" `
+          -client_id "${{ env.ORCH_CLIENT_ID }}" `
+          -client_secret "${{ env.ORCH_CLIENT_SECRET }}" `
+          -folder_organization_unit "${{ env.ORCH_DEV_FOLDER_PATH }}" `
+          -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}"
+
+  create-pull-request:
+    needs: publish-uipath-nuget-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: pull-request
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: "master"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_label: "feature, automated pr"
+          pr_title: "Pull Request From Github Action"
