@@ -40,6 +40,16 @@ jobs:
           echo "Cleaning up previous run"
           rm -rf "${{ github.workspace }}"
 
+  test-marketplace-access:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Node Setup Action
+        uses: actions/setup-node@v3 # Using a different, common public action
+        with:
+          node-version: '16'
+      - name: Verify Node Version
+        run: node -v
+
   build-uipath-nuget-package:
     needs: cleaner
     runs-on: windows-latest
