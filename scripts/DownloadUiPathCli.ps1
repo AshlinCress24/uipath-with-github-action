@@ -4,54 +4,50 @@ param(
     [string]$WorkspacePath
 )
 
-# This is the verified URL you provided for UiPath CLI v2.0.44
-$cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/download/v2.0.44/uipathcli-windows-amd64.zip" 
+# Define the target directory for the UiPath CLI
+$cliDir = Join-Path $WorkspacePath "uipathcli"
 
-$cliZipPath = Join-Path $WorkspacePath "UiPathStudioCli.zip"
-$cliExtractDir = Join-Path $WorkspacePath "uipathcli"
-# IMPORTANT: The executable name inside uipathcli-windows-amd64.zip is 'uipath.exe'
-$cliExePath = Join-Path $cliExtractDir "uipath.exe" # Adjusted for GitHub releases ZIP
+# Define the UiPath CLI version and download URL
+# IMPORTANT: Use a recent stable version that supports the 'auth' command.
+# For example, 23.10.0 or 24.4.0 (check UiPath docs for latest stable LTS or Enterprise release)
+$cliVersion = "24.4.0" # <--- IMPORTANT: Update to a recent UiPath CLI version (e.g., 23.10.0, 24.4.0)
+$cliDownloadUrl = "https://download.uipath.com/platform/uipathcli/$cliVersion/uipath.cli.zip"
+$zipFilePath = Join-Path $cliDir "uipath.cli.zip"
+$cliExecutableName = "uipath.exe" # Name of the executable inside the zip
 
-Write-Host "Creating CLI extraction directory: $cliExtractDir"
-New-Item -ItemType Directory -Path $cliExtractDir -Force | Out-Null
+Write-Host "Downloading UiPath CLI v$cliVersion from $cliDownloadUrl..."
 
-Write-Host "Attempting to download UiPath CLI from: $cliDownloadUrl"
 try {
-    Invoke-WebRequest -Uri $cliDownloadUrl -OutFile $cliZipPath -UseBasicParsing -TimeoutSec 300
-    Write-Host "Successfully downloaded UiPath CLI to $cliZipPath"
+    # Create the directory if it doesn't exist
+    if (-not (Test-Path $cliDir -PathType Container)) {
+        New-Item -ItemType Directory -Path $cliDir -Force | Out-Null
+        Write-Host "Created directory: $cliDir"
+    }
+
+    # Download the ZIP file
+    Invoke-WebRequest -Uri $cliDownloadUrl -OutFile $zipFilePath -UseBasicParsing
+
+    Write-Host "Successfully downloaded UiPath CLI to $zipFilePath."
+
+    # Extract the ZIP file
+    Expand-Archive -Path $zipFilePath -DestinationPath $cliDir -Force
+
+    Write-Host "Successfully extracted UiPath CLI to $cliDir."
+
+    # Add the CLI directory to the PATH for the current job
+    # The UiPath CLI executable name (e.g., uipath.exe) might be directly in $cliDir
+    # or in a subfolder like 'cli' depending on the zip structure.
+    # We will assume it's directly in $cliDir for now, as indicated by previous logs.
+    $env:Path += ";$cliDir"
+    Write-Host "Added '$cliDir' to PATH for this session."
+
+    # Make the executable name available to subsequent steps via GITHUB_ENV
+    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=$cliExecutableName"
+    Write-Host "Set UIPATH_CLI_EXECUTABLE_NAME to '$cliExecutableName' in GITHUB_ENV."
+
 } catch {
-    Write-Error ("Failed to download UiPath CLI from " + $cliDownloadUrl + ": " + $_.Exception.Message)
-    exit 1 # Exit with a non-zero code to indicate failure
+    Write-Error ("Failed to download or setup UiPath CLI: " + $_.Exception.Message)
+    exit 1
 }
 
-Write-Host "Extracting UiPath CLI to: $cliExtractDir"
-try {
-    Expand-Archive -Path $cliZipPath -DestinationPath $cliExtractDir -Force
-    Write-Host "Successfully extracted UiPath CLI to $cliExtractDir"
-} catch {
-    Write-Error ("Failed to extract UiPath CLI from " + $cliZipPath + ": " + $_.Exception.Message)
-    exit 1 # Exit with a non-zero code to indicate failure
-}
-
-Write-Host "Adding UiPath CLI directory to PATH: $cliExtractDir"
-Add-Content -Path $env:GITHUB_PATH -Value $cliExtractDir
-
-Write-Host "Verifying uipath.exe presence and version..." # Adjusted message
-if (Test-Path $cliExePath) {
-    Write-Host "uipath.exe found at: $cliExePath" # Adjusted message
-    & $cliExePath --version # Verify CLI version
-    # The 'help' command for v2.0.44 is typically '--help' or context-specific.
-    # We'll rely on the version verification for now to ensure this step passes.
-    # If you later need to use help, use '& $cliExePath --help' or '& $cliExePath <command> --help'
-} else {
-    Write-Error "uipath.exe not found after extraction! Expected at: $cliExePath" # Adjusted message
-    Write-Host "Listing contents of ${cliExtractDir} for debugging:" 
-    Get-ChildItem -Path $cliExtractDir -Recurse -Force | Format-Table -AutoSize
-    exit 1 # Exit with a non-zero code to indicate failure
-}
-
-# Set the CLI executable name as an environment variable for subsequent steps/jobs
-# This is now confirmed to be 'uipath.exe' for the GitHub releases ZIP
-echo "UIPATH_CLI_EXECUTABLE_NAME=uipath.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-Write-Host "UiPath CLI setup complete."
+Write-Host "UiPath CLI Setup completed."
