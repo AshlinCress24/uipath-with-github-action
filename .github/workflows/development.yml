@@ -54,8 +54,8 @@ jobs:
           $installPath = $cliDir
           $zipPath = Join-Path $installPath "uipathcli.zip"
 
-          # Changed URL to download v1.18.0 of uipcli.exe - CORRECT!
-          $DownloadUrl = "https://download.uipath.com/platform/uipath-cli-v1.18.0.zip"
+          # FIX: Changed URL to download v1.18.0 from GitHub Releases
+          $DownloadUrl = "https://github.com/UiPath/uipathcli/releases/download/v1.18.0/uipcli-windows-amd64.zip"
 
           Write-Host "Creating CLI directory: $installPath"
           New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -70,7 +70,7 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
 
           Write-Host "Verifying uipcli.exe presence and version..."
-          $cliExePath = Join-Path $installPath "uipcli.exe" # CORRECT: refers to uipcli.exe
+          $cliExePath = Join-Path $installPath "uipcli.exe" 
           if (Test-Path $cliExePath) {
               Write-Host "uipcli.exe found at: $cliExePath"
               & $cliExePath --version
@@ -84,7 +84,7 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "uipcli.exe" # FIX: Changed to uipcli.exe
+          $cliExePath = Join-Path $cliDir "uipcli.exe" # Correctly referencing uipcli.exe
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
@@ -95,7 +95,6 @@ jobs:
               & $cliExePath --version
               Write-Host "Running '${cliExePath} --help':"
               & $cliExePath --help
-              # FIX: Removed the "Skipping 'package --help' check" line, it's not relevant here
           } else {
               Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
@@ -104,7 +103,7 @@ jobs:
       - name: Build Nuget Package
         shell: pwsh
         run: |
-          # The UiPathPack.ps1 script must also be updated to use uipcli.exe and its syntax
+          # The UiPathPack.ps1 script must be updated to use uipcli.exe and its syntax
           ${{ github.workspace }}\scripts\UiPathPack.ps1 `
           -project_path "${{ github.workspace }}\${{ env.PROJECT_FOLDER }}\${{ env.PROJECT_NAME }}\project.json" `
           -output_path "${{ github.workspace }}\package"
@@ -132,8 +131,8 @@ jobs:
           $installPath = "$env:GITHUB_WORKSPACE\uipathcli"
           New-Item -ItemType Directory -Force -Path $installPath
           
-          # FIX: Changed URL to download v1.18.0 of uipcli.exe
-          $downloadUrl = "https://download.uipath.com/platform/uipath-cli-v1.18.0.zip"
+          # FIX: Changed URL to download v1.18.0 from GitHub Releases
+          $downloadUrl = "https://github.com/UiPath/uipathcli/releases/download/v1.18.0/uipcli-windows-amd64.zip"
           Write-Host "Downloading UiPath CLI from $downloadUrl"
           Invoke-WebRequest -Uri $downloadUrl -OutFile "$installPath\uipathcli.zip" -UseBasicParsing
           
@@ -147,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          $cliExePath = Join-Path $cliDir "uipcli.exe" # FIX: Changed to uipcli.exe
+          $cliExePath = Join-Path $cliDir "uipcli.exe" # Correctly referencing uipcli.exe
           
           Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
@@ -158,7 +157,6 @@ jobs:
               & $cliExePath --version
               Write-Host "Running '${cliExePath} --help':"
               & $cliExePath --help
-              # FIX: Removed the "Skipping 'package --help' check" line
           } else {
               Write-Error "${cliExePath} NOT FOUND! This should not happen at this stage."
               exit 1
@@ -167,7 +165,7 @@ jobs:
       - name: Publish Nuget Package to DEV
         shell: pwsh
         run: |
-          # The UiPathDeploy.ps1 script must also be updated to use uipcli.exe and its syntax
+          # The UiPathDeploy.ps1 script must be updated to use uipcli.exe and its syntax
           ${{ github.workspace }}\scripts\UiPathDeploy.ps1 `
           -packages_path "${{ github.workspace }}\package" `
           -orchestrator_url "${{ env.ORCH_URL }}" `
