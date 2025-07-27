@@ -11,7 +11,6 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,6 +21,9 @@ jobs:
 
       - name: Pack UiPath Project
         shell: pwsh
+        env:
+          UIPATH_CLI_EXECUTABLE_NAME: ${{ env.UIPATH_CLI_EXECUTABLE_NAME }}
+          PATH: ${{ env.PATH }}
         run: pwsh ./scripts/UiPathPack.ps1 `
           -project_path "${{ github.workspace }}/project.json" `
           -output_path "${{ github.workspace }}/output_packages"
@@ -35,7 +37,6 @@ jobs:
   deploy:
     runs-on: windows-latest
     needs: build
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
