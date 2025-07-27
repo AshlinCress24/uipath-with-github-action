@@ -19,7 +19,7 @@ jobs:
       - name: Setup UiPath CLI
         uses: Mikael-RnD/setup-uipath@v2
         with:
-          version: latest  # You may specify a fixed version (e.g., 2.0.44) if needed
+          version: 2.0.43  # Fixed version to avoid feed API errors
 
       - name: Pack UiPath Project
         shell: pwsh
@@ -44,7 +44,7 @@ jobs:
       - name: Setup UiPath CLI
         uses: Mikael-RnD/setup-uipath@v2
         with:
-          version: latest
+          version: 2.0.43  # Same fixed version as build job
 
       - name: Download UiPath Package Artifact
         uses: actions/download-artifact@v4
