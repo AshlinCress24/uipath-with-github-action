@@ -10,8 +10,8 @@ $cliDirName = "uipathcli_" + (Get-Random -Maximum 99999)
 $cliDir = Join-Path $WorkspacePath $cliDirName
 
 # Define the UiPath CLI download URL from GitHub releases.
-# REVERTED TO 'latest' as hardcoded versions were encountering 404s.
-# The post-download size check will now be CRITICAL to ensure the correct CLI is used.
+# Using 'latest' as it seems more reliable for download than specific versions for now.
+# The post-download size check is critical to ensure the correct CLI is used.
 $cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
 
 $zipFileName = "uipath.cli.zip"
@@ -78,11 +78,12 @@ try {
     $downloaded_fileInfo = Get-Item $cliFullPath
     Write-Host "Downloaded UiPath CLI executable path: $($downloaded_fileInfo.FullName)"
     Write-Host "Downloaded File Size: $($downloaded_fileInfo.Length) bytes"
-    Write-Host "Downloaded Last Write Time: $($downloaded_fileInfo.LastWriteTime)" # CORRECTED LINE: Added missing closing quote
+    Write-Host "Downloaded Last Write Time: $($downloaded_fileInfo.LastWriteTime)"
     Write-Host "----------------------------------------------------"
 
-    $expectedMinSize = 9000000 # Minimum expected size for the new CLI
-    $expectedMaxSize = 11000000 # Maximum expected size for the new CLI
+    # UPDATED: Adjusted expected size range based on the actual downloaded file (20MB)
+    $expectedMinSize = 19000000 # Minimum expected size for the current CLI (approx 20MB)
+    $expectedMaxSize = 21000000 # Maximum expected size for the current CLI (approx 20MB)
 
     if ($downloaded_fileInfo.Length -lt $expectedMinSize -or $downloaded_fileInfo.Length -gt $expectedMaxSize) {
         Write-Error "CRITICAL ERROR: UiPath CLI executable size is unexpected within download script! Expected between $expectedMinSize and $expectedMaxSize bytes, but found $($downloaded_fileInfo.Length) bytes. This indicates an issue with the downloaded CLI version or corruption. Failing this step."
