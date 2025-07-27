@@ -7,15 +7,12 @@ param(
 # Define the target directory for the UiPath CLI
 $cliDir = Join-Path $WorkspacePath "uipathcli"
 
-# Define the UiPath CLI version and download URL
-# IMPORTANT: Use a recent stable version that supports the 'auth' command.
-# For example, 23.10.0 or 24.4.0 (check UiPath docs for latest stable LTS or Enterprise release)
-$cliVersion = "24.4.0" # <--- IMPORTANT: Update to a recent UiPath CLI version (e.g., 23.10.0, 24.4.0)
-$cliDownloadUrl = "https://download.uipath.com/platform/uipathcli/$cliVersion/uipath.cli.zip"
-$zipFilePath = Join-Path $cliDir "uipath.cli.zip"
+# Define the UiPath CLI download URL from GitHub releases (recommended for latest public CLI)
+$cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+$zipFilePath = Join-Path $cliDir "uipath.cli.zip" # Using a generic name for the downloaded zip
 $cliExecutableName = "uipath.exe" # Name of the executable inside the zip
 
-Write-Host "Downloading UiPath CLI v$cliVersion from $cliDownloadUrl..."
+Write-Host "Downloading UiPath CLI from $cliDownloadUrl (latest Windows AMD64 release)..."
 
 try {
     # Create the directory if it doesn't exist
@@ -29,15 +26,13 @@ try {
 
     Write-Host "Successfully downloaded UiPath CLI to $zipFilePath."
 
-    # Extract the ZIP file
+    # Expand-Archive requires the destination path to exist for the files to be extracted directly into it.
+    # The previous code created $cliDir, so this should work.
     Expand-Archive -Path $zipFilePath -DestinationPath $cliDir -Force
 
     Write-Host "Successfully extracted UiPath CLI to $cliDir."
 
     # Add the CLI directory to the PATH for the current job
-    # The UiPath CLI executable name (e.g., uipath.exe) might be directly in $cliDir
-    # or in a subfolder like 'cli' depending on the zip structure.
-    # We will assume it's directly in $cliDir for now, as indicated by previous logs.
     $env:Path += ";$cliDir"
     Write-Host "Added '$cliDir' to PATH for this session."
 
