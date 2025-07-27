@@ -26,7 +26,7 @@ if (-not (Test-Path $output_path)) {
 
 Write-Host "Running: uipathcli studio package pack --file `"$project_path`" --output `"$output_path`""
 
-$process = Start-Process -FilePath "uipathcli" -ArgumentList @("studio", "package", "pack", "--file", "$project_path", "--output", "$output_path") -NoNewWindow -Wait -PassThru
+$process = Start-Process -FilePath "uipathcli" -ArgumentList @("studio", "package", "pack", "--file", $project_path, "--output", $output_path) -NoNewWindow -Wait -PassThru
 
 if ($process.ExitCode -ne 0) {
     Write-Error "uipathcli pack command failed with exit code $($process.ExitCode)"
