@@ -32,13 +32,16 @@ $nupkgFullPath = $nupkgFile.FullName
 Write-Host "Found package: $nupkgFullPath"
 
 Write-Host "Authenticating to Orchestrator..."
-# --- FIX IS HERE: Added 'identity' subcommand ---
-& $uipathCliExecutable identity auth client-credentials `
-    --url "$orchestrator_url" `
-    --organization-name "$organization_name" `
-    --tenant "$orchestrator_tenant" `
-    --client-id "$client_id" `
-    --client-secret "$client_secret"
+# Pass arguments as an array for robust parsing
+$authArgs = @(
+    "identity", "auth", "client-credentials",
+    "--url", "$orchestrator_url",
+    "--organization-name", "$organization_name",
+    "--tenant", "$orchestrator_tenant",
+    "--client-id", "$client_id",
+    "--client-secret", "$client_secret"
+)
+& $uipathCliExecutable $authArgs # Execute with array of arguments
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI authentication failed with exit code $LASTEXITCODE"
@@ -46,10 +49,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Publishing package to Orchestrator folder: $folder_organization_unit"
-# This command should still be correct
-& $uipathCliExecutable orchestrator publish `
-    --file "$nupkgFullPath" `
-    --folder-path "$folder_organization_unit"
+# Pass arguments as an array for robust parsing
+$publishArgs = @(
+    "orchestrator", "publish",
+    "--file", "$nupkgFullPath",
+    "--folder-path", "$folder_organization_unit"
+)
+& $uipathCliExecutable $publishArgs # Execute with array of arguments
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI 'orchestrator publish' command failed with exit code $LASTEXITCODE"
