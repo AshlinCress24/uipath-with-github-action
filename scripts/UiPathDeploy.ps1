@@ -36,8 +36,11 @@ Write-Host "Found package: $nupkgFullPath"
 Write-Host "Attempting authentication by creating UiPath CLI config file..."
 
 # Determine the correct home directory for the .uipath folder
-# On Windows, $env:HOME usually resolves to C:\Users\<YourUser> or similar
-$uipathConfigDir = Join-Path $env:HOME ".uipath"
+# On Windows, $env:USERPROFILE is more reliable than $env:HOME
+$uipathConfigDir = Join-Path $env:USERPROFILE ".uipath"
+
+# Add a diagnostic check for the path
+Write-Host "Resolved UiPath config directory path: $uipathConfigDir"
 
 if (-not (Test-Path $uipathConfigDir)) {
     Write-Host "Creating .uipath configuration directory: $uipathConfigDir"
@@ -67,7 +70,7 @@ Set-Content -Path $configFilePath -Value $configFileContent -Force
 # Verify config file creation (optional, but good for debugging)
 if (Test-Path $configFilePath) {
     Write-Host "UiPath CLI config file created successfully."
-    # For debugging, you can uncomment the next line to see the content.
+    # For debugging, you can uncomment the next lines to see the content.
     # Be cautious with secrets in logs!
     # Write-Host "Config file content:"
     # Get-Content $configFilePath | Write-Host
