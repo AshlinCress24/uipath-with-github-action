@@ -7,10 +7,8 @@ param(
 
 Write-Host "Starting UiPath Package Build..."
 
-# Define the full path to uipcli.exe based on the GitHub Actions workspace
-# NOTE: The PATH from the GITHUB_PATH step is not reliably picked up by the *same* job's PowerShell scripts.
-# So, we explicitly reference the exe here.
-$uipcliPath = "$env:GITHUB_WORKSPACE\uipathcli\uipcli.exe"
+# Define the full path to uipath.exe (CORRECTED NAME)
+$uipathCliExecutable = "$env:GITHUB_WORKSPACE\uipathcli\uipath.exe" # <-- CHANGED TO uipath.exe
 
 # Ensure the destination folder exists
 if (-not (Test-Path $destination_folder)) {
@@ -20,8 +18,8 @@ if (-not (Test-Path $destination_folder)) {
 Write-Host "Packaging project: $project_json_path"
 Write-Host "Destination folder: $destination_folder"
 
-# Execute the uipcli pack command using the full path
-& $uipcliPath package pack --source "$project_json_path" --destination "$destination_folder"
+# Execute the uipath.exe pack command using the full path
+& $uipathCliExecutable package pack --source "$project_json_path" --destination "$destination_folder"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "UiPath CLI 'pack' command failed with exit code $LASTEXITCODE"
