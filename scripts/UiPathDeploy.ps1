@@ -32,9 +32,7 @@ $nupkgFullPath = $nupkgFile.FullName
 Write-Host "Found package: $nupkgFullPath"
 
 Write-Host "Authenticating to Orchestrator..."
-# Execute the uipath.exe auth command using the full path
-# Note: Based on the --help output, 'auth' is a top-level command under 'identity',
-# so it should be 'identity auth client-credentials'. Let's correct this here.
+# --- FIX IS HERE: Added 'identity' subcommand ---
 & $uipathCliExecutable identity auth client-credentials `
     --url "$orchestrator_url" `
     --organization-name "$organization_name" `
@@ -48,7 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Publishing package to Orchestrator folder: $folder_organization_unit"
-# Execute the uipath.exe orchestrator publish command using the full path
+# This command should still be correct
 & $uipathCliExecutable orchestrator publish `
     --file "$nupkgFullPath" `
     --folder-path "$folder_organization_unit"
