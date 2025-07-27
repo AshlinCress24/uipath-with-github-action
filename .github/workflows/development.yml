@@ -63,26 +63,26 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
       
-      # --- ADD THIS NEW DIAGNOSTIC STEP HERE ---
+      # --- VERIFY STEP - SYNTAX CORRECTED ---
       - name: Verify Extracted CLI Content
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          Write-Host "Listing contents of $cliDir:"
+          Write-Host "Listing contents of ${cliDir}:" # <--- FIXED HERE
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
           # Optional: Verify the file exists and is an executable
           $cliExePath = Join-Path $cliDir "uipcli.exe"
           if (Test-Path $cliExePath) {
-              Write-Host "$cliExePath exists!"
+              Write-Host "${cliExePath} exists!" # <--- FIXED HERE
               # Attempt to run it directly with its full path for a test
-              Write-Host "Attempting to run $cliExePath --version directly:"
+              Write-Host "Attempting to run ${cliExePath} --version directly:" # <--- FIXED HERE
               & $cliExePath --version
           } else {
-              Write-Error "$cliExePath NOT FOUND!"
+              Write-Error "${cliExePath} NOT FOUND!" # <--- FIXED HERE
               exit 1
           }
-      # --- END NEW DIAGNOSTIC STEP ---
+      # --- END VERIFY STEP ---
 
       - name: Build Nuget Package
         shell: pwsh
@@ -122,24 +122,24 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
 
-      # --- ADD THIS NEW DIAGNOSTIC STEP HERE AS WELL ---
+      # --- VERIFY STEP (PUBLISH JOB) - SYNTAX CORRECTED ---
       - name: Verify Extracted CLI Content (Publish Job)
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          Write-Host "Listing contents of $cliDir:"
+          Write-Host "Listing contents of ${cliDir}:" # <--- FIXED HERE
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
           $cliExePath = Join-Path $cliDir "uipcli.exe"
           if (Test-Path $cliExePath) {
-              Write-Host "$cliExePath exists!"
-              Write-Host "Attempting to run $cliExePath --version directly:"
+              Write-Host "${cliExePath} exists!" # <--- FIXED HERE
+              Write-Host "Attempting to run ${cliExePath} --version directly:" # <--- FIXED HERE
               & $cliExePath --version
           } else {
-              Write-Error "$cliExePath NOT FOUND!"
+              Write-Error "${cliExePath} NOT FOUND!" # <--- FIXED HERE
               exit 1
           }
-      # --- END NEW DIAGNOSTIC STEP ---
+      # --- END VERIFY STEP ---
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
