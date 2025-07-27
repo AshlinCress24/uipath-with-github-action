@@ -14,7 +14,7 @@ Write-Host "Starting UiPath CLI download and setup from: $cliDownloadUrl"
 Write-Host "Target CLI directory: $cliDir"
 
 try {
-    # Clean existing directory if present
+    # Remove existing CLI directory if present
     if (Test-Path $cliDir -PathType Container) {
         Remove-Item -Path $cliDir -Recurse -Force -ErrorAction Stop
         Write-Host "Removed existing CLI directory: $cliDir"
@@ -34,25 +34,31 @@ try {
     Write-Host "Listing files after extraction for diagnostics:"
     Get-ChildItem -Path $cliDir -Recurse | ForEach-Object { Write-Host $_.FullName }
 
-    # Locate required executable 'uipathcli.exe' ONLY (fail if missing)
-    $cliExePath = Get-ChildItem -Path $cliDir -Filter "uipathcli.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    # Search for executable: prefer 'uipathcli.exe', fallback to 'uipath.exe'
+    $possibleExecutables = @("uipathcli.exe", "uipath.exe")
+    $cliExePath = $null
+    foreach ($exeName in $possibleExecutables) {
+        $cliExePath = Get-ChildItem -Path $cliDir -Filter $exeName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cliExePath) { break }
+    }
 
     if (-not $cliExePath) {
-        Write-Error "Required executable 'uipathcli.exe' not found in extracted files. Please verify download URL and archive contents."
+        Write-Error "Neither 'uipathcli.exe' nor 'uipath.exe' was found in extracted files. Please verify download URL and archive contents."
         exit 1
     }
 
     $cliExecutablePath = $cliExePath.DirectoryName
     $cliFullPath = $cliExePath.FullName
+    $cliExecutableName = $cliExePath.Name
     Write-Host "Found CLI executable at: $cliFullPath"
 
     # Add CLI directory to PATH environment for current and future steps
     $env:Path = "$cliExecutablePath;$env:Path"
     Add-Content -Path $env:GITHUB_ENV -Value "PATH=$cliExecutablePath`;$env:PATH"
 
-    # Set important environment variables for later steps
+    # Set environment variables for use in subsequent GitHub Actions steps
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_FULL_PATH=$cliFullPath"
-    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=uipathcli.exe"
+    Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=$cliExecutableName"
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_DIR=$cliExecutablePath"
 
     # Cleanup the downloaded ZIP file
