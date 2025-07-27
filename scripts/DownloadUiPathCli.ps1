@@ -9,8 +9,12 @@ param(
 $cliDirName = "uipathcli_" + (Get-Random -Maximum 99999)
 $cliDir = Join-Path $WorkspacePath $cliDirName
 
-# Define the UiPath CLI download URL from GitHub releases
-$cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/latest/download/uipathcli-windows-amd64.zip"
+# Define the UiPath CLI download URL from GitHub releases.
+# IMPORTANT: Instead of 'latest', we're now specifying a concrete version.
+# You might need to update this URL periodically to get the newest CLI.
+$cliVersion = "24.5.8973.29827" # Example: Check https://github.com/UiPath/uipathcli/releases for the latest stable version
+$cliDownloadUrl = "https://github.com/UiPath/uipathcli/releases/download/v$cliVersion/uipathcli-windows-amd64.zip"
+
 $zipFileName = "uipath.cli.zip"
 $zipFilePath = Join-Path $cliDir $zipFileName # Store the zip temporarily in the target dir
 
@@ -20,8 +24,6 @@ Write-Host "Download URL: $cliDownloadUrl"
 
 try {
     # --- Step 1: Guaranteed Clean-up of any existing CLI folder by this dynamic name ---
-    # This specifically removes the dynamic directory if it somehow already exists (e.g., from a previous partial run).
-    # For a fresh run, it generally won't exist.
     Write-Host "Performing cleanup for dynamic CLI directory: $cliDir (should be clean initially)"
     if (Test-Path $cliDir -PathType Container) {
         Remove-Item -Path $cliDir -Recurse -Force -ErrorAction Stop
@@ -38,13 +40,11 @@ try {
     Write-Host "Successfully downloaded UiPath CLI to $zipFilePath."
 
     # --- Step 3: Extract the ZIP directly into the $cliDir ---
-    # This handles both cases: if uipath.exe is at the root of the zip, or if it's in a single subfolder.
     Write-Host "Extracting UiPath CLI directly into $cliDir..."
     Expand-Archive -Path $zipFilePath -DestinationPath $cliDir -Force -ErrorAction Stop
     Write-Host "Successfully extracted UiPath CLI."
 
     # --- Step 4: Dynamically Find the actual uipath.exe and set its containing directory to PATH ---
-    # This is crucial for robustness, as the exact extraction path might vary slightly.
     $uipathExe = Get-ChildItem -Path $cliDir -Filter "uipath.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
 
     if (-not $uipathExe) {
@@ -62,18 +62,34 @@ try {
     Write-Host "Directory containing 'uipath.exe' (to be added to PATH): $cliExecutablePath"
 
     # Add the directory containing the executable to the PATH for the current job
-    # This makes 'uipath.exe' directly callable in subsequent steps without specifying full path.
     $env:Path += ";$cliExecutablePath"
     Write-Host "Added '$cliExecutablePath' to PATH for this session."
 
     # Expose the full executable path and its containing directory to subsequent steps
-    # These environment variables are crucial for other steps to correctly locate and use the CLI.
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_FULL_PATH=$cliFullPath"
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_EXECUTABLE_NAME=$cliExecutableName"
     Add-Content -Path $env:GITHUB_ENV -Value "UIPATH_CLI_DIR=$cliExecutablePath"
 
     Write-Host "Set UIPATH_CLI_FULL_PATH to '$cliFullPath' in GITHUB_ENV."
     Write-Host "Set UIPATH_CLI_DIR to '$cliExecutablePath' in GITHUB_ENV."
+
+    # --- NEW: Check file size immediately within this script ---
+    Write-Host "--- Post-Download Check within DownloadUiPathCli.ps1 ---"
+    $downloaded_fileInfo = Get-Item $cliFullPath
+    Write-Host "Downloaded UiPath CLI executable path: $($downloaded_fileInfo.FullName)"
+    Write-Host "Downloaded File Size: $($downloaded_fileInfo.Length) bytes"
+    Write-Host "Downloaded Last Write Time: $($downloaded_fileInfo.LastWriteTime)"
+    Write-Host "----------------------------------------------------"
+
+    $expectedMinSize = 9000000 # Minimum expected size for the new CLI
+    $expectedMaxSize = 11000000 # Maximum expected size for the new CLI
+
+    if ($downloaded_fileInfo.Length -lt $expectedMinSize -or $downloaded_fileInfo.Length -gt $expectedMaxSize) {
+        Write-Error "CRITICAL WARNING: UiPath CLI executable size is unexpected within download script! Expected between $expectedMinSize and $expectedMaxSize bytes, but found $($downloaded_fileInfo.Length) bytes. This indicates an issue with the downloaded CLI version or corruption."
+        # We will still allow it to continue for now, but this is a strong indicator of a problem.
+    } else {
+        Write-Host "UiPath CLI executable size is within expected range within download script. ($($downloaded_fileInfo.Length) bytes)"
+    }
 
     # --- Step 5: Clean up the downloaded zip file ---
     Write-Host "Cleaning up downloaded zip file..."
