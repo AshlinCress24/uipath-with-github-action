@@ -63,13 +63,17 @@ jobs:
           Write-Host "Extracting UiPath CLI to $installPath"
           Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
           
-          # Add the CLI's directory to the PATH for the current job session
-          $env:Path += ";$installPath"
-          Write-Host "UiPath CLI installed to $installPath and added to PATH."
-          
-          # Verify installation (optional, but good for debugging)
-          uipcli --version
+          # Add the extracted path to GITHUB_PATH environment file.
+          # This makes 'uipcli' available to all subsequent steps in this job.
+          Write-Host "Adding '$installPath' to GITHUB_PATH"
+          Add-Content -Path $env:GITHUB_PATH -Value $installPath
       # MANUAL CLI SETUP END
+
+      - name: Verify UiPath CLI is available (Optional but Recommended)
+        shell: pwsh
+        run: |
+          # This step will confirm uipcli is now in the PATH for subsequent steps
+          uipcli --version
 
       - name: Build Nuget Package
         shell: pwsh
@@ -109,13 +113,17 @@ jobs:
           Write-Host "Extracting UiPath CLI to $installPath"
           Expand-Archive -Path "$installPath\uipathcli.zip" -DestinationPath $installPath -Force
           
-          # Add the CLI's directory to the PATH for the current job session
-          $env:Path += ";$installPath"
-          Write-Host "UiPath CLI installed to $installPath and added to PATH."
-          
-          # Verify installation (optional, but good for debugging)
-          uipcli --version
+          # Add the extracted path to GITHUB_PATH environment file.
+          # This makes 'uipcli' available to all subsequent steps in this job.
+          Write-Host "Adding '$installPath' to GITHUB_PATH"
+          Add-Content -Path $env:GITHUB_PATH -Value $installPath
       # MANUAL CLI SETUP END
+
+      - name: Verify UiPath CLI is available (Optional but Recommended)
+        shell: pwsh
+        run: |
+          # This step will confirm uipcli is now in the PATH for subsequent steps
+          uipcli --version
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
