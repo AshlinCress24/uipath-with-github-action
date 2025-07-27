@@ -63,23 +63,23 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
       
-      # --- VERIFY STEP - SYNTAX CORRECTED ---
+      # --- VERIFY STEP - CORRECTED EXECUTABLE NAME ---
       - name: Verify Extracted CLI Content
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          Write-Host "Listing contents of ${cliDir}:" # <--- FIXED HERE
+          Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
           # Optional: Verify the file exists and is an executable
-          $cliExePath = Join-Path $cliDir "uipcli.exe"
+          $cliExePath = Join-Path $cliDir "uipath.exe" # <-- CHANGED TO uipath.exe
           if (Test-Path $cliExePath) {
-              Write-Host "${cliExePath} exists!" # <--- FIXED HERE
+              Write-Host "${cliExePath} exists!"
               # Attempt to run it directly with its full path for a test
-              Write-Host "Attempting to run ${cliExePath} --version directly:" # <--- FIXED HERE
+              Write-Host "Attempting to run ${cliExePath} --version directly:"
               & $cliExePath --version
           } else {
-              Write-Error "${cliExePath} NOT FOUND!" # <--- FIXED HERE
+              Write-Error "${cliExePath} NOT FOUND!"
               exit 1
           }
       # --- END VERIFY STEP ---
@@ -122,21 +122,21 @@ jobs:
           Write-Host "Adding '$installPath' to GITHUB_PATH (for potential future steps)"
           Add-Content -Path $env:GITHUB_PATH -Value $installPath
 
-      # --- VERIFY STEP (PUBLISH JOB) - SYNTAX CORRECTED ---
+      # --- VERIFY STEP (PUBLISH JOB) - CORRECTED EXECUTABLE NAME ---
       - name: Verify Extracted CLI Content (Publish Job)
         shell: pwsh
         run: |
           $cliDir = "$env:GITHUB_WORKSPACE\uipathcli"
-          Write-Host "Listing contents of ${cliDir}:" # <--- FIXED HERE
+          Write-Host "Listing contents of ${cliDir}:"
           Get-ChildItem -Path $cliDir -Recurse -Force | Format-Table -AutoSize
           
-          $cliExePath = Join-Path $cliDir "uipcli.exe"
+          $cliExePath = Join-Path $cliDir "uipath.exe" # <-- CHANGED TO uipath.exe
           if (Test-Path $cliExePath) {
-              Write-Host "${cliExePath} exists!" # <--- FIXED HERE
-              Write-Host "Attempting to run ${cliExePath} --version directly:" # <--- FIXED HERE
+              Write-Host "${cliExePath} exists!"
+              Write-Host "Attempting to run ${cliExePath} --version directly:"
               & $cliExePath --version
           } else {
-              Write-Error "${cliExePath} NOT FOUND!" # <--- FIXED HERE
+              Write-Error "${cliExePath} NOT FOUND!"
               exit 1
           }
       # --- END VERIFY STEP ---
