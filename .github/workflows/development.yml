@@ -50,8 +50,7 @@ jobs:
       - name: Download and Setup UiPath CLI
         shell: pwsh
         run: |
-          "${{ github.workspace }}\scripts\DownloadUiPathCli.ps1" `
-          -WorkspacePath "${{ github.workspace }}"
+          "${{ github.workspace }}\scripts\DownloadUiPathCli.ps1" -WorkspacePath "${{ github.workspace }}"
 
       - name: Build Nuget Package
         shell: pwsh
@@ -84,8 +83,7 @@ jobs:
       - name: Download and Setup UiPath CLI (for Publish Job)
         shell: pwsh
         run: |
-          "${{ github.workspace }}\scripts\DownloadUiPathCli.ps1" `
-          -WorkspacePath "$env:GITHUB_WORKSPACE"
+          "${{ github.workspace }}\scripts\DownloadUiPathCli.ps1" -WorkspacePath "$env:GITHUB_WORKSPACE"
 
       - name: Publish Nuget Package to DEV
         shell: pwsh
@@ -101,15 +99,4 @@ jobs:
           -cli_executable_name "${{ env.UIPATH_CLI_EXECUTABLE_NAME }}"
 
   create-pull-request:
-    needs: publish-uipath-nuget-package
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: pull-request
-        uses: repo-sync/pull-request@v2
-        with:
-          destination_branch: "master"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_label: "feature, automated pr"
-          pr_title: "Pull Request From Github Action"
+    needs: publish-uipath-
