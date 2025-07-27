@@ -1,77 +1,90 @@
 param(
+    [Parameter(Mandatory = $true)]
     [string]$packages_path,
+
+    [Parameter(Mandatory = $true)]
     [string]$orchestrator_url,
+
+    [Parameter(Mandatory = $true)]
     [string]$organization_name,
+
+    [Parameter(Mandatory = $true)]
     [string]$orchestrator_tenant,
+
+    [Parameter(Mandatory = $true)]
     [string]$client_id,
+
+    [Parameter(Mandatory = $true)]
     [string]$client_secret,
-    [string]$folder_organization_unit
+
+    [Parameter(Mandatory = $false)]
+    [string]$folder_organization_unit = ""
 )
 
-$cli_executable_name = $env:UIPATH_CLI_EXECUTABLE_NAME
+# Retrieve the CLI executable name from environment variable
+$cliExe = $env:UIPATH_CLI_EXECUTABLE_NAME
 
-Write-Host "Starting UiPath Deploy Script (using $cli_executable_name)..."
-
-if ([string]::IsNullOrEmpty($cli_executable_name)) {
-    Write-Error "Environment variable UIPATH_CLI_EXECUTABLE_NAME is not set."
+if (-not $cliExe) {
+    Write-Error "Environment variable 'UIPATH_CLI_EXECUTABLE_NAME' is not set. Cannot proceed."
     exit 1
 }
 
-$cli_path = Get-Command $cli_executable_name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-if (-not $cli_path) {
-    Write-Error "UiPath CLI executable '$cli_executable_name' not found in PATH for deployment."
+Write-Host "Starting UiPath Deploy Script (using $cliExe)..."
+
+if (-not (Get-Command $cliExe -ErrorAction SilentlyContinue)) {
+    Write-Error "UiPath CLI executable '$cliExe' not found in PATH."
     exit 1
 }
-Write-Host "UiPath CLI Executable: $cli_path"
 
-try {
-    Write-Host "Logging in to UiPath Orchestrator..."
-    & $cli_executable_name auth login `
-        --url "$orchestrator_url" `
-        --organization-name "$organization_name" `
-        --tenant-name "$orchestrator_tenant" `
-        --client-id "$client_id" `
-        --client-secret "$client_secret"
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "UiPath CLI login failed with exit code $LASTEXITCODE."
-        exit 1
-    }
-    Write-Host "Successfully logged in to Orchestrator."
-
-    $package_file = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Select-Object -First 1 -ExpandProperty FullName
-    if (-not $package_file) {
-        Write-Error "No .nupkg file found in '$packages_path'."
-        exit 1
-    }
-
-    $folder_arg = ""
-    if (![string]::IsNullOrEmpty($folder_organization_unit)) {
-        $folder_arg = "--folder-path `"$folder_organization_unit`""
-    }
-
-    Write-Host "Publishing package to Orchestrator..."
-    & $cli_executable_name package deploy `
-        --path "$package_file" `
-        $folder_arg
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "UiPath CLI package deploy failed with exit code $LASTEXITCODE."
-        exit 1
-    }
-    Write-Host "Successfully deployed package."
-
-} catch {
-    Write-Error ("Error deploying UiPath project: " + $_.Exception.Message)
+if (-not (Test-Path $packages_path -PathType Container)) {
+    Write-Error "Packages folder not found at path: $packages_path"
     exit 1
-} finally {
-    Write-Host "Logging out from UiPath Orchestrator..."
-    & $cli_executable_name auth logout -Force
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Logout command failed but deployment completed."
-    } else {
-        Write-Host "Successfully logged out."
-    }
 }
 
-Write-Host "UiPath Deploy Script completed."
+# Find the first .nupkg package (you can adjust if you want to deploy multiple or specific package)
+$packageFile = Get-ChildItem -Path $packages_path -Filter "*.nupkg" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+if (-not $packageFile) {
+    Write-Error "No .nupkg package files found in $packages_path"
+    exit 1
+}
+
+Write-Host "Using package file: $($packageFile.FullName)"
+
+# Prepare CLI login arguments
+$loginArgs = @(
+    "login",
+    "--client-id", "`"$client_id`"",
+    "--client-secret", "`"$client_secret`"",
+    "--tenant-name", "`"$orchestrator_tenant`"",
+    "--url", "`"$orchestrator_url`""
+
+)
+
+Write-Host "Logging into UiPath Orchestrator..."
+
+$loginProcess = Start-Process -FilePath $cliExe -ArgumentList $loginArgs -NoNewWindow -Wait -PassThru -ErrorAction Stop
+
+if ($loginProcess.ExitCode -ne 0) {
+    Write-Error "UiPath CLI login failed with exit code $($loginProcess.ExitCode)"
+    exit $loginProcess.ExitCode
+}
+
+# Deploy (publish) the package
+$publishArgs = @(
+    "package",
+    "publish",
+    "--path", "`"$($packageFile.FullName)`"",
+    "--folder", "`"$folder_organization_unit`""
+)
+
+Write-Host "Publishing package to Orchestrator..."
+
+$publishProcess = Start-Process -FilePath $cliExe -ArgumentList $publishArgs -NoNewWindow -Wait -PassThru -ErrorAction Stop
+
+if ($publishProcess.ExitCode -ne 0) {
+    Write-Error "UiPath CLI package publish failed with exit code $($publishProcess.ExitCode)"
+    exit $publishProcess.ExitCode
+}
+
+Write-Host "Package deployed successfully to Orchestrator."
